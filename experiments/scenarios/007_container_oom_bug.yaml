@@ -1,0 +1,53 @@
+id: "007-container-oom-bug"
+title: "Container OOMKilled on startup"
+description: >
+  Debug a container that dies with exit code 137. Tests whether the agent
+  connects the exit code + JVM heap symptom to the two required fixes (heap
+  size AND container memory limit).
+
+memories:
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, exit code 137 on a Docker container means the Linux OOM
+      killer terminated the process. For JVM services like OpenSearch, this
+      almost always means the heap is set larger than the container memory
+      limit allows.
+    subject: "exit_code_137_meaning"
+    importance: 0.9
+    confidence: 0.95
+
+  - memory_type: episodic
+    content: >-
+      For run {run_id}, memory_api died during OpenSearch bootstrap with exit
+      code 137. docker inspect showed OOMKilled=true. Heap was 1G but
+      mem_limit was unset (defaulted below 1G on the Jetson).
+    event: "opensearch_oomkilled_incident"
+    importance: 0.85
+    confidence: 0.95
+
+  - memory_type: procedural
+    content: >-
+      For run {run_id}, to fix OpenSearch OOMKilled in Docker Compose you must
+      set both the JVM heap (OPENSEARCH_JAVA_OPTS=-Xms1g -Xmx1g) AND the
+      container memory limit (mem_limit 2g). Setting only one is a common
+      trap because the JVM will keep growing past its Xmx briefly during
+      collections.
+    name: "fix_opensearch_oom_in_docker"
+    importance: 0.9
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, my OpenSearch container just died with exit code 137. What's happening?"
+    top_k: 5
+    expected_top_content_contains: ["oom", "137", "memory", "killer"]
+    expected_recall_contains_any: ["OOMKilled", "137", "OOM killer", "memory"]
+    expected_answer_contains: ["oom"]
+    expected_answer_missing: ["network", "cpu"]
+
+  - id: "q2"
+    question: "For run {run_id}, what's the correct fix for OpenSearch container OOM?"
+    top_k: 5
+    expected_top_content_contains: ["mem_limit", "-xmx", "opensearch_java_opts", "java_opts"]
+    expected_recall_contains_any: ["mem_limit", "-Xmx1g", "OPENSEARCH_JAVA_OPTS"]
+    expected_answer_contains: ["mem_limit"]

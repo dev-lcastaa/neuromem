@@ -1,0 +1,43 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# --- Environments ---
+.venv/
+venv/
+env/
+.env
+.env.local
+.env.*.local
+
+# --- IDE / editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Docker / OpenSearch data ---
+opensearch/data/
+infra/opensearch/data/
+
+# --- Experiment outputs ---
+experiments/results/
+
+# --- Streamlit ---
+.streamlit/secrets.toml

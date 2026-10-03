@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuroMem POC — project breakdown</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --bg-soft: #1e293b;
+    --bg-card: #172033;
+    --border: #334155;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #38bdf8;
+    --accent-alt: #a78bfa;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --code-bg: #0b1120;
+    --shadow: 0 4px 14px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+  }
+  header.hero {
+    padding: 2.5rem 2rem;
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 2.5rem;
+    box-shadow: var(--shadow);
+  }
+  header.hero h1 {
+    margin: 0 0 .5rem;
+    font-size: 2.4rem;
+    letter-spacing: -.02em;
+  }
+  header.hero .subtitle {
+    color: var(--text-dim);
+    font-size: 1.05rem;
+    max-width: 62ch;
+    margin: 0;
+  }
+  header.hero .meta {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .chip {
+    display: inline-block;
+    padding: .25rem .7rem;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, .12);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, .35);
+    font-size: .8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .chip.alt { color: var(--accent-alt); background: rgba(167,139,250,.12); border-color: rgba(167,139,250,.35); }
+  .chip.ok { color: var(--green); background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.35); }
+
+  h2 {
+    margin-top: 3rem;
+    margin-bottom: 1rem;
+    font-size: 1.55rem;
+    letter-spacing: -.01em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: .5rem;
+  }
+  h3 {
+    margin-top: 2rem;
+    margin-bottom: .75rem;
+    font-size: 1.15rem;
+    color: var(--accent);
+  }
+  p { margin: .5rem 0 1rem; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code, kbd, pre {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  code {
+    background: var(--code-bg);
+    padding: .1rem .4rem;
+    border-radius: 4px;
+    font-size: .9em;
+    color: #e2e8f0;
+  }
+  pre {
+    background: var(--code-bg);
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    overflow-x: auto;
+    font-size: .88rem;
+    color: #cbd5e1;
+  }
+  pre code { padding: 0; background: transparent; }
+
+  ul, ol { padding-left: 1.4rem; }
+  li { margin: .3rem 0; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1rem 0 1.5rem;
+    background: var(--bg-card);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  th, td {
+    padding: .6rem .85rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: .92rem;
+    vertical-align: top;
+  }
+  th {
+    background: rgba(56, 189, 248, .08);
+    font-weight: 600;
+    color: var(--accent);
+    border-bottom: 2px solid var(--border);
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(56, 189, 248, .04); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0 1.5rem;
+  }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.1rem 1.2rem;
+    box-shadow: var(--shadow);
+  }
+  .card .label {
+    color: var(--text-dim);
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: .25rem;
+  }
+  .card .value {
+    font-size: 1.5rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .card .hint {
+    color: var(--text-dim);
+    font-size: .85rem;
+    margin-top: .35rem;
+  }
+  .card.accent { border-color: rgba(56, 189, 248, .5); }
+  .card.accent .value { color: var(--accent); }
+
+  blockquote {
+    margin: 1rem 0;
+    padding: .75rem 1.1rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(56, 189, 248, .06);
+    color: var(--text);
+    border-radius: 0 8px 8px 0;
+  }
+  blockquote p { margin: 0; font-style: italic; }
+
+  .status-ok { color: var(--green); font-weight: 600; }
+  .status-partial { color: var(--amber); font-weight: 600; }
+
+  .phase-list { list-style: none; padding: 0; margin: 0; }
+  .phase-list li {
+    margin: .5rem 0;
+    padding: .8rem 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+  }
+  .phase-list .phase-num {
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-weight: 700;
+    min-width: 4.5ch;
+  }
+  .phase-list .phase-title {
+    font-weight: 600;
+    margin-right: .5rem;
+  }
+  .phase-list .phase-desc {
+    color: var(--text-dim);
+    font-size: .92rem;
+  }
+
+  .ascii {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    white-space: pre;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: .82rem;
+    line-height: 1.35;
+    color: #cbd5e1;
+  }
+
+  footer.credits {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: .85rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hero">
+  <h1>NeuroMem POC</h1>
+  <p class="subtitle">
+    A local, experimental AI-agent memory system inspired by useful properties of human memory.
+    Tests whether structured, consolidating, associative memory beats conventional vector RAG.
+  </p>
+  <div class="meta">
+    <span class="chip">Python 3.12</span>
+    <span class="chip">FastAPI</span>
+    <span class="chip">LangGraph</span>
+    <span class="chip">OpenSearch k-NN</span>
+    <span class="chip">Streamlit</span>
+    <span class="chip alt">OpenAI gpt-4o / text-embedding-3-large</span>
+    <span class="chip ok">Phase 0 → 7 delivered</span>
+  </div>
+</header>
+
+<h2 id="hypothesis">The research question</h2>
+
+<blockquote>
+  <p>
+    Can an agent with structured, consolidating, associative, decaying memory behave more
+    effectively than an agent using conventional vector RAG alone?
+  </p>
+</blockquote>
+
+<p>
+  Conventional RAG treats every retrieval as a fresh cosine-similarity lookup. NeuroMem
+  layers <em>importance</em>, <em>recency</em>, <em>activation</em> (retrieval-reinforced,
+  decayed with time), <em>relationships</em>, and <em>keyword</em> signals on top of the
+  same semantic base — and consolidates raw episodic memories into durable semantic and
+  procedural facts, always preserving provenance and never overwriting conflicts.
+</p>
+
+<h2 id="topology">Deployment topology</h2>
+
+<div class="ascii">                     +--------------------------+
+                     |     Dell OptiPlex        |
+                     |                          |
+                     |  OpenSearch 2.16+        |
+                     |  3-node cluster          |
+                     |  homelab-opensearch      |
+                     |  https://192.168.1.208   |
+                     |    :9200  API            |
+                     |    :5601  Dashboards     |
+                     |                          |
+                     |  Indexes:                |
+                     |    neuromem-episodic     |
+                     |    neuromem-semantic     |
+                     |    neuromem-procedural   |
+                     |    neuromem-relationships|
+                     +-------------+------------+
+                                   |
+                                   | LAN (HTTPS, basic auth)
+                                   |
+                     +-------------+------------+
+                     |    Jetson Orin Nano      |
+                     |                          |
+                     |  memory_api  (FastAPI)   |
+                     |    :8000                 |
+                     |  dashboard   (Streamlit) |
+                     |    :8501                 |
+                     +-------------+------------+
+                                   |
+                                   | HTTPS
+                                   v
+                          +-----------------+
+                          |  OpenAI API     |
+                          |  gpt-4o         |
+                          |  gpt-4o-mini    |
+                          |  text-embedding |
+                          |  -3-large (3072)|
+                          +-----------------+</div>
+
+<h2 id="phases">Delivered phases</h2>
+
+<ol class="phase-list">
+  <li>
+    <span class="phase-num">0</span>
+    <div>
+      <span class="phase-title">Bootstrap.</span>
+      <span class="phase-desc">Repo, config, structured logging, adapters (LLM + embeddings), health endpoints, contract-visible 501 stubs.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">1</span>
+    <div>
+      <span class="phase-title">Storage.</span>
+      <span class="phase-desc">CRUD, relationships, ULID-prefixed IDs routed to correct indexes, idempotent bootstrap.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">2</span>
+    <div>
+      <span class="phase-title">Retrieval.</span>
+      <span class="phase-desc">Hybrid semantic (k-NN) + keyword (BM25) + one-hop relationship expansion, 6-signal weighted rank, mandatory <code>Explanation</code> object.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">3</span>
+    <div>
+      <span class="phase-title">Agent.</span>
+      <span class="phase-desc">7-node LangGraph on OpenAI: classify → recall → plan → tools → evaluate → answer → candidate extraction.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">4</span>
+    <div>
+      <span class="phase-title">Consolidation.</span>
+      <span class="phase-desc">Async worker + LLM conflict adjudication. Turns become episodic sources; candidates become derived memories with <code>DERIVED_FROM</code> / <code>SUPERSEDES</code> / <code>CONTRADICTS</code> edges. Never overwrites.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">5</span>
+    <div>
+      <span class="phase-title">Lifecycle.</span>
+      <span class="phase-desc">Retrieval-time strengthening (bulk painless script), query-time decay, <code>/access</code> + <code>/decay</code> + <code>/{id}/history</code>. No deletes.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">6</span>
+    <div>
+      <span class="phase-title">Evaluation.</span>
+      <span class="phase-desc">YAML scenario harness, Mode A (naive RAG) vs Mode B (NeuroMem) with identical LLM prompts, markdown report with per-mode metrics.</span>
+    </div>
+  </li>
+  <li>
+    <span class="phase-num">7</span>
+    <div>
+      <span class="phase-title">Dashboard.</span>
+      <span class="phase-desc">Streamlit UI with six real tabs backed by four new endpoints and a pyvis relationship graph.</span>
+    </div>
+  </li>
+</ol>
+
+<h2 id="architecture">Component layers</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Layer</th>
+      <th>Location</th>
+      <th>Responsibility</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Config</td>
+      <td><code>memory/config.py</code></td>
+      <td>Pydantic-settings <code>Settings</code>; single source of truth for every knob.</td>
+    </tr>
+    <tr>
+      <td>Adapters</td>
+      <td><code>models/llm.py</code>, <code>models/embeddings.py</code></td>
+      <td><code>OpenAIProvider</code> + <code>OpenAIEmbeddingProvider</code> behind Protocols. Batching, retry, dimension assertion, JSON mode.</td>
+    </tr>
+    <tr>
+      <td>Domain</td>
+      <td><code>memory/domain/</code></td>
+      <td>Discriminated union of <code>EpisodicMemory</code> / <code>SemanticMemory</code> / <code>ProceduralMemory</code>, plus <code>Relationship</code>. All with <code>extra=forbid</code>.</td>
+    </tr>
+    <tr>
+      <td>Storage</td>
+      <td><code>memory/storage/</code></td>
+      <td><code>MemoryStore</code> Protocol + <code>OpenSearchMemoryStore</code> implementation. All k-NN, BM25, mget, bulk painless updates.</td>
+    </tr>
+    <tr>
+      <td>Retrieval</td>
+      <td><code>memory/retrieval/</code></td>
+      <td>Ranking helpers, <code>RankWeights</code>, <code>RecallQuery</code>, <code>RecallResponse</code>, <code>Explanation</code>.</td>
+    </tr>
+    <tr>
+      <td>Service facade</td>
+      <td><code>memory/service.py</code></td>
+      <td><code>MemoryService</code>: embeds on write, orchestrates recall, schedules strengthening, computes decay, stats, search, timeline, graph.</td>
+    </tr>
+    <tr>
+      <td>Consolidation</td>
+      <td><code>memory/consolidation/</code></td>
+      <td>Job envelope, LLM-driven adjudication, in-process <code>asyncio.Queue</code> + worker.</td>
+    </tr>
+    <tr>
+      <td>Agent</td>
+      <td><code>apps/agent/</code></td>
+      <td>LangGraph state + node closures, prompts, models. Zero direct storage calls — depends only on <code>MemoryService</code>.</td>
+    </tr>
+    <tr>
+      <td>Memory API</td>
+      <td><code>apps/memory_api/</code></td>
+      <td>FastAPI application factory + all routes. Lifespan owns clients and the consolidation worker.</td>
+    </tr>
+    <tr>
+      <td>Dashboard</td>
+      <td><code>apps/dashboard/app.py</code></td>
+      <td>Streamlit UI. Six tabs; talks only over HTTP to <code>memory_api</code>.</td>
+    </tr>
+    <tr>
+      <td>Experiments</td>
+      <td><code>experiments/</code></td>
+      <td>Scenario loader, RAG vs NeuroMem modes, metrics, markdown report generator, CLI entrypoint.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="ranking">Ranking model</h2>
+
+<p>
+  Baseline weights from plan §10; fully configurable per-query or via <code>Settings</code>.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Signal</th>
+      <th class="num">Weight</th>
+      <th>Source</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>semantic</code></td><td class="num">0.40</td><td>OpenSearch k-NN cosine, already in [0, 1]</td></tr>
+    <tr><td><code>keyword</code></td><td class="num">0.15</td><td>BM25 <code>multi_match</code> normalised by max in the result set</td></tr>
+    <tr><td><code>importance</code></td><td class="num">0.20</td><td>Author-supplied 0–1</td></tr>
+    <tr><td><code>recency</code></td><td class="num">0.10</td><td><code>exp(-λ_recency · age_days_since_created)</code></td></tr>
+    <tr><td><code>activation</code></td><td class="num">0.10</td><td><code>activation · exp(-λ_activation · age_days_since_last_access)</code></td></tr>
+    <tr><td><code>relationship</code></td><td class="num">0.05</td><td>One-hop boost when both endpoints are in the candidate set</td></tr>
+  </tbody>
+</table>
+
+<h2 id="api">HTTP surface</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Method &amp; path</th>
+      <th>Purpose</th>
+      <th>Phase</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td><code>GET /health</code></td><td>Liveness</td><td>0</td></tr>
+    <tr><td><code>GET /health/opensearch</code></td><td>Cluster readiness</td><td>0</td></tr>
+    <tr><td><code>GET /health/llm</code></td><td>LLM ping (cost-gated)</td><td>0</td></tr>
+    <tr><td><code>GET /health/embeddings</code></td><td>Embedding ping (cost-gated)</td><td>0</td></tr>
+    <tr><td><code>POST /memory/store</code></td><td>Create a memory (auto-embeds if <code>content_vector</code> is null)</td><td>1</td></tr>
+    <tr><td><code>GET /memory/{id}</code></td><td>Fetch a memory (vector excluded by default)</td><td>1</td></tr>
+    <tr><td><code>POST /memory/relate</code></td><td>Create a relationship edge</td><td>1</td></tr>
+    <tr><td><code>GET /memory/{id}/relationships</code></td><td>List edges touching a memory</td><td>1</td></tr>
+    <tr><td><code>POST /memory/recall</code></td><td>Hybrid retrieval with explanation</td><td>2</td></tr>
+    <tr><td><code>POST /agent/chat</code></td><td>Run a full agent turn; enqueues consolidation</td><td>3</td></tr>
+    <tr><td><code>POST /memory/consolidate</code></td><td>Run consolidation synchronously</td><td>4</td></tr>
+    <tr><td><code>POST /memory/access</code></td><td>Explicit activation bump for a batch</td><td>5</td></tr>
+    <tr><td><code>POST /memory/decay</code></td><td>Read-only decay report</td><td>5</td></tr>
+    <tr><td><code>GET /memory/{id}/history</code></td><td>Lifecycle snapshot + relationships</td><td>5</td></tr>
+    <tr><td><code>GET /memory/stats</code></td><td>Counts + averages across all indexes</td><td>7</td></tr>
+    <tr><td><code>GET /memory/search</code></td><td>Free-text keyword search</td><td>7</td></tr>
+    <tr><td><code>GET /memory/timeline</code></td><td>Recent memories, newest first</td><td>7</td></tr>
+    <tr><td><code>GET /memory/graph</code></td><td>Subgraph around a memory (BFS, depth ≤ 3)</td><td>7</td></tr>
+    <tr><td><code>POST /memory/conflicts/resolve</code></td><td>Reserved for future explicit conflict UI (returns 501)</td><td>—</td></tr>
+  </tbody>
+</table>
+
+<h2 id="stats">Test surface and current state</h2>
+
+<div class="grid">
+  <div class="card accent">
+    <div class="label">Unit tests</div>
+    <div class="value">147</div>
+    <div class="hint">passing</div>
+  </div>
+  <div class="card accent">
+    <div class="label">Integration tests</div>
+    <div class="value">12</div>
+    <div class="hint">against the live cluster</div>
+  </div>
+  <div class="card accent">
+    <div class="label">Source files typechecked</div>
+    <div class="value">44</div>
+    <div class="hint">mypy strict clean</div>
+  </div>
+  <div class="card accent">
+    <div class="label">Ruff</div>
+    <div class="value">clean</div>
+    <div class="hint">lint + format</div>
+  </div>
+</div>
+
+<h2 id="benchmark">Phase 6 benchmark — last recorded run</h2>
+
+<p>
+  10 queries × 2 retrieval modes against the live OpenSearch cluster + OpenAI. Substring
+  scoring, identical answer prompt across modes. Full report:
+  <a href="../experiments/results/report-2026-08-15T19-43-05Z.md">
+    experiments/results/report-2026-08-15T19-43-05Z.md
+  </a>.
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Mode</th>
+      <th class="num">P@K</th>
+      <th class="num">Recall</th>
+      <th class="num">Top-1</th>
+      <th class="num">Answer ✓</th>
+      <th class="num">Retr. ms</th>
+      <th class="num">Answ. ms</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>neuromem</code></td>
+      <td class="num">0.400</td>
+      <td class="num">1.000</td>
+      <td class="num"><span class="status-ok">1.000</span></td>
+      <td class="num"><span class="status-ok">1.000</span></td>
+      <td class="num">473</td>
+      <td class="num">736</td>
+    </tr>
+    <tr>
+      <td><code>rag</code></td>
+      <td class="num"><span class="status-ok">0.460</span></td>
+      <td class="num">1.000</td>
+      <td class="num">0.900</td>
+      <td class="num">1.000</td>
+      <td class="num"><span class="status-ok">327</span></td>
+      <td class="num">850</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  Notable case: <code>003-embedding-model-change/q1</code>. Naive RAG surfaced the older
+  preference at rank 1 despite the fresher one being explicitly marked with higher
+  importance and activation. NeuroMem's importance + activation signals correctly
+  promoted the newer statement, and its LLM answer avoided the forbidden term
+  (<code>bge-m3</code>). Exactly the plan §17 kind of scenario where structured memory
+  pays off.
+</p>
+
+<h2 id="run">How to run</h2>
+
+<h3>API + dashboard on the Jetson</h3>
+<pre><code>uv sync --all-groups
+cp .env.example .env   # fill in OPENAI_API_KEY, OPENSEARCH_* auth
+
+uv run --no-sync uvicorn apps.memory_api.main:app --host 0.0.0.0 --port 8000
+uv run --no-sync streamlit run apps/dashboard/app.py --server.port 8501</code></pre>
+
+<h3>Test suites</h3>
+<pre><code>uv run --no-sync pytest tests/unit -q
+uv run --no-sync pytest -m integration -v   # needs live cluster + OpenAI</code></pre>
+
+<h3>Full evaluation benchmark</h3>
+<pre><code>uv run --no-sync python -m experiments.main
+# → writes experiments/results/report-&lt;utc-timestamp&gt;.md</code></pre>
+
+<h3>Static analysis</h3>
+<pre><code>uv run --no-sync ruff check .
+uv run --no-sync ruff format --check .
+uv run --no-sync mypy memory models apps experiments</code></pre>
+
+<h2 id="decisions">Load-bearing design decisions</h2>
+
+<ol>
+  <li>
+    <strong>Never overwrite a memory.</strong> Conflicting facts get <code>SUPERSEDES</code>
+    or <code>CONTRADICTS</code> edges; the old row stays queryable. Decay is query-time
+    only — no writes, no deletes.
+  </li>
+  <li>
+    <strong>ULID-prefixed IDs</strong> (<code>epi_</code> / <code>sem_</code> / <code>pro_</code> /
+    <code>rel_</code>) route to the correct index as a pure string function. No lookup roundtrip.
+  </li>
+  <li>
+    <strong><code>extra=forbid</code> on every Pydantic model</strong> mirrors OpenSearch's
+    <code>dynamic: strict</code> mapping. Schema drift fails fast on both sides.
+  </li>
+  <li>
+    <strong>Discriminated union for <code>Memory</code></strong> on <code>memory_type</code>.
+    One <code>POST /memory/store</code> handler serves all three types; <code>TypeAdapter</code>
+    dispatches on read.
+  </li>
+  <li>
+    <strong>Explanation is a first-class field</strong>, not a debug hint. Retrieval Trace
+    tab renders per-signal contributions directly from it.
+  </li>
+  <li>
+    <strong>Bulk painless <code>_bulk</code> script</strong> for strengthening: one
+    round-trip bumps activation + access_count + last_accessed_at atomically per doc.
+  </li>
+  <li>
+    <strong>Two-model LLM adapter, one client</strong>: <code>gpt-4o-mini</code> for
+    extraction and classification (JSON mode, temp=0), <code>gpt-4o</code> for the answer
+    node and conflict adjudication.
+  </li>
+  <li>
+    <strong>Route ordering matters in FastAPI</strong> — literal <code>/memory/stats</code>
+    and friends declared before <code>/memory/{memory_id}</code> to avoid the wildcard
+    swallowing them.
+  </li>
+  <li>
+    <strong>Evaluation isolation via per-run <code>{run_id}</code> markers</strong> in
+    seeded memory content, not deletes. Runs coexist forever; report includes the run IDs.
+  </li>
+  <li>
+    <strong>The agent depends on <code>MemoryService</code>, not <code>MemoryStore</code>.</strong>
+    Storage can be swapped without touching the graph, and consolidation reuses the same
+    facade the routes see.
+  </li>
+</ol>
+
+<h2 id="scope">Explicitly out of scope</h2>
+<ul>
+  <li>Learned or reinforcement-tuned ranking weights.</li>
+  <li>Cross-encoder reranking.</li>
+  <li>Multi-hop relationship traversal beyond depth 3.</li>
+  <li>LLM-as-judge scoring in evaluation (substring matching only).</li>
+  <li>Distributed workers or Kafka / Redis queues (in-process <code>asyncio.Queue</code>).</li>
+  <li>Automatic deletion of decayed / superseded memories.</li>
+  <li>Multi-tenant memory scoping (single global pool, <code>agent_id</code> is provenance only).</li>
+  <li>Local LLM inference (POC uses OpenAI end-to-end).</li>
+</ul>
+
+<h2 id="docs">Sibling documentation</h2>
+<ul>
+  <li><a href="architecture.md">architecture.md</a> — component boundaries and topology</li>
+  <li><a href="memory-model.md">memory-model.md</a> — schema, provenance, per-type fields</li>
+  <li><a href="retrieval.md">retrieval.md</a> — ranking formula + cognitive lifecycle</li>
+  <li><a href="consolidation.md">consolidation.md</a> — pipeline, non-overwrite guarantee, cost</li>
+  <li><a href="experiments.md">experiments.md</a> — benchmark harness, metrics, interpretation</li>
+</ul>
+
+<footer class="credits">
+  NeuroMem POC — generated 2026-08-15.
+</footer>
+
+</div>
+</body>
+</html>

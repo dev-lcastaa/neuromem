@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeuroMem — technical overview</title>
+<style>
+  :root {
+    --bg: #0b1120;
+    --bg-soft: #111827;
+    --bg-card: #1a2337;
+    --bg-code: #060a15;
+    --border: #2a3550;
+    --border-soft: #1e293b;
+    --text: #e5e9f5;
+    --text-dim: #94a3b8;
+    --text-dimmer: #64748b;
+    --accent: #38bdf8;
+    --accent-alt: #a78bfa;
+    --accent-warm: #fb923c;
+    --green: #4ade80;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Layout */
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 3rem;
+    padding-top: 2rem;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.sticky { position: static; }
+  }
+
+  /* Hero */
+  header.hero {
+    padding: 4rem 1.5rem 3rem;
+    background: linear-gradient(135deg, #172033 0%, #0b1120 60%);
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  header.hero .container {
+    max-width: 900px;
+  }
+  header.hero .kicker {
+    color: var(--accent);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+  header.hero h1 {
+    margin: 0 0 1rem;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+  }
+  header.hero .lede {
+    font-size: 1.25rem;
+    color: var(--text-dim);
+    max-width: 68ch;
+    margin: 0 auto 1.75rem;
+  }
+  header.hero .chip-row {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    font-size: 0.8rem;
+    font-family: ui-monospace, monospace;
+  }
+  .chip.alt { color: var(--accent-alt); background: rgba(167, 139, 250, 0.1); border-color: rgba(167, 139, 250, 0.3); }
+  .chip.warm { color: var(--accent-warm); background: rgba(251, 146, 60, 0.1); border-color: rgba(251, 146, 60, 0.3); }
+
+  /* Navigation */
+  nav.sticky {
+    position: sticky;
+    top: 2rem;
+    height: fit-content;
+    align-self: start;
+  }
+  nav.sticky h3 {
+    color: var(--text-dimmer);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 0 0 1rem;
+  }
+  nav.sticky ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: navnum;
+  }
+  nav.sticky li {
+    counter-increment: navnum;
+    margin: 0.25rem 0;
+  }
+  nav.sticky li a {
+    display: block;
+    padding: 0.25rem 0;
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    padding-left: 0.75rem;
+    transition: all 0.15s;
+  }
+  nav.sticky li a::before {
+    content: counter(navnum, decimal-leading-zero);
+    color: var(--text-dimmer);
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    margin-right: 0.5rem;
+  }
+  nav.sticky li a:hover {
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+
+  /* Content */
+  main {
+    min-width: 0;
+    padding-bottom: 6rem;
+  }
+  section {
+    padding: 3rem 0 2rem;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  section:last-child { border-bottom: none; }
+  section h2 {
+    color: var(--accent);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 0 0 1rem;
+    letter-spacing: -0.015em;
+  }
+  section h2::before {
+    content: attr(data-num) " ";
+    color: var(--text-dimmer);
+    font-family: ui-monospace, monospace;
+    font-size: 0.9rem;
+    font-weight: 400;
+    margin-right: 0.5rem;
+  }
+  section h3 {
+    color: var(--text);
+    font-size: 1.2rem;
+    margin: 2.25rem 0 0.75rem;
+  }
+  section p { margin: 0.75rem 0; color: #cbd5e1; }
+  section p.lede { font-size: 1.1rem; color: var(--text); }
+  section a { color: var(--accent); text-decoration: none; }
+  section a:hover { text-decoration: underline; }
+  section ul, section ol { padding-left: 1.5rem; color: #cbd5e1; }
+  section li { margin: 0.35rem 0; }
+  section strong { color: var(--text); }
+  section em { color: var(--accent-alt); font-style: normal; }
+
+  /* Code */
+  code {
+    background: var(--bg-code);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.88em;
+    color: #e2e8f0;
+    border: 1px solid var(--border-soft);
+  }
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.1rem 1.25rem;
+    overflow-x: auto;
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    line-height: 1.55;
+    color: #cbd5e1;
+    margin: 1.25rem 0;
+  }
+  pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    color: inherit;
+  }
+  .ascii {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    overflow-x: auto;
+    white-space: pre;
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.4;
+    color: #cbd5e1;
+    margin: 1.25rem 0;
+  }
+
+  /* Tables */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 1.25rem 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    font-size: 0.92rem;
+  }
+  th, td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+  }
+  th {
+    background: rgba(56, 189, 248, 0.05);
+    color: var(--accent);
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* Callouts */
+  blockquote {
+    margin: 1.5rem 0;
+    padding: 1rem 1.25rem;
+    border-left: 3px solid var(--accent);
+    background: rgba(56, 189, 248, 0.05);
+    border-radius: 0 6px 6px 0;
+  }
+  blockquote.warm { border-left-color: var(--accent-warm); background: rgba(251, 146, 60, 0.05); }
+  blockquote.alt { border-left-color: var(--accent-alt); background: rgba(167, 139, 250, 0.05); }
+  blockquote p { margin: 0; color: var(--text); }
+  blockquote .label {
+    display: block;
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.35rem;
+  }
+  blockquote.warm .label { color: var(--accent-warm); }
+  blockquote.alt .label { color: var(--accent-alt); }
+
+  /* Cards / grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  .grid.two { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.35rem;
+  }
+  .card.accent { border-color: rgba(56, 189, 248, 0.4); }
+  .card.alt { border-color: rgba(167, 139, 250, 0.4); }
+  .card.warm { border-color: rgba(251, 146, 60, 0.4); }
+  .card h4 {
+    margin: 0 0 0.5rem;
+    font-size: 0.95rem;
+    color: var(--accent);
+    font-family: ui-monospace, monospace;
+  }
+  .card.alt h4 { color: var(--accent-alt); }
+  .card.warm h4 { color: var(--accent-warm); }
+  .card p { margin: 0; font-size: 0.9rem; color: var(--text-dim); }
+  .card .stat {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin: 0.35rem 0 0.25rem;
+  }
+  .card.alt .stat { color: var(--accent-alt); }
+  .card.warm .stat { color: var(--accent-warm); }
+  .card .stat-hint {
+    color: var(--text-dimmer);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* Signal pill (for ranking table) */
+  .pill {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    background: rgba(56, 189, 248, 0.1);
+    color: var(--accent);
+    border-radius: 4px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.78rem;
+  }
+
+  /* Formula box */
+  .formula {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    font-family: ui-monospace, monospace;
+    color: var(--accent);
+    text-align: center;
+    font-size: 0.95rem;
+    margin: 1.25rem 0;
+  }
+  .formula .op { color: var(--text-dim); }
+  .formula .weight { color: var(--accent-warm); }
+
+  /* Footer */
+  footer.foot {
+    margin-top: 3rem;
+    padding: 2rem 0;
+    border-top: 1px solid var(--border);
+    color: var(--text-dimmer);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="container">
+    <div class="kicker">Technical overview · v1.0</div>
+    <h1>NeuroMem</h1>
+    <p class="lede">
+      A memory system for AI agents that behaves like human memory —
+      remembers events, extracts durable facts, consolidates conflicts, strengthens with use, and fades gracefully.
+      Built as a proof-of-concept research project to answer one question:
+      <strong>does structured, associative memory beat conventional vector RAG?</strong>
+    </p>
+    <div class="chip-row">
+      <span class="chip">Python 3.12</span>
+      <span class="chip">FastAPI</span>
+      <span class="chip">LangGraph</span>
+      <span class="chip">OpenSearch k-NN</span>
+      <span class="chip">Streamlit</span>
+      <span class="chip alt">OpenAI gpt-4o</span>
+      <span class="chip alt">text-embedding-3-large</span>
+      <span class="chip warm">Phase 0 → 7 complete</span>
+    </div>
+  </div>
+</header>
+
+<!-- LAYOUT -->
+<div class="container">
+<div class="layout">
+
+<!-- NAVIGATION -->
+<nav class="sticky">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#problem">The problem</a></li>
+    <li><a href="#solution">The solution</a></li>
+    <li><a href="#memory-model">Memory model</a></li>
+    <li><a href="#retrieval">Retrieval pipeline</a></li>
+    <li><a href="#lifecycle">Cognitive lifecycle</a></li>
+    <li><a href="#consolidation">Consolidation</a></li>
+    <li><a href="#agent">The agent loop</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#tech-stack">Technology stack</a></li>
+    <li><a href="#evaluation">Evaluation</a></li>
+    <li><a href="#end-to-end">End-to-end flow</a></li>
+    <li><a href="#decisions">Design decisions</a></li>
+    <li><a href="#future">What's next</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<!-- 1. THE PROBLEM -->
+<section id="problem">
+  <h2 data-num="01">The problem</h2>
+  <p class="lede">
+    LLMs have no memory between conversations. Every question is a blank slate. The industry's default answer is
+    retrieval-augmented generation (RAG) — but RAG is a search engine bolted onto a chatbot, not a memory.
+  </p>
+
+  <p>
+    A vanilla RAG pipeline does one thing well: given a question, find documents that look similar, and hand them
+    to the LLM. It has no concept of <em>time</em>, no notion of <em>importance</em>, no ability to <em>learn from being right or wrong</em>,
+    and no way to notice when new information <em>contradicts</em> what it said last week. It answers your question
+    today the same way it would have answered last month, even if you've told it three times that things changed.
+  </p>
+
+  <blockquote class="warm">
+    <span class="label">The core issue</span>
+    <p>
+      A software engineering agent that hits the same bug pattern for the tenth time should be smarter about it the
+      tenth time than it was the first. RAG makes it exactly as smart every time.
+    </p>
+  </blockquote>
+
+  <h3>What human memory does that RAG doesn't</h3>
+  <div class="grid">
+    <div class="card">
+      <h4>Timeline</h4>
+      <p>You remember when something happened, and in what order. RAG has no sense of "before" or "after."</p>
+    </div>
+    <div class="card">
+      <h4>Importance</h4>
+      <p>Some memories matter more than others — critical facts vs. small talk. RAG treats every document equally.</p>
+    </div>
+    <div class="card">
+      <h4>Strengthening</h4>
+      <p>Memories you use often become more accessible. RAG doesn't know which document you use most.</p>
+    </div>
+    <div class="card">
+      <h4>Decay</h4>
+      <p>Stale memories fade into the background — but stay recoverable if needed. RAG has no forgetting curve.</p>
+    </div>
+    <div class="card">
+      <h4>Association</h4>
+      <p>Ideas remind you of other ideas. RAG returns islands, not networks.</p>
+    </div>
+    <div class="card">
+      <h4>Conflict</h4>
+      <p>When new information contradicts old, human memory notices. RAG silently returns whichever matches better.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2. THE SOLUTION -->
+<section id="solution">
+  <h2 data-num="02">The solution</h2>
+  <p class="lede">
+    NeuroMem is a memory engine that gives an AI agent all six of those properties. It stores different <em>kinds</em>
+    of memory, connects them into a graph, ranks retrieval by six independent signals, strengthens what gets used,
+    fades what doesn't, and — crucially — <strong>never silently overwrites</strong> a conflicting fact.
+  </p>
+
+  <blockquote>
+    <span class="label">The research question</span>
+    <p>
+      Can an agent with structured, consolidating, associative, decaying memory behave more effectively than an
+      agent using conventional vector RAG alone?
+    </p>
+  </blockquote>
+
+  <p>
+    The project is a full proof-of-concept: a running FastAPI backend, an OpenSearch cluster storing the memories,
+    a LangGraph agent that talks to the memory engine, an async worker that consolidates conversations into durable
+    facts, a Streamlit dashboard for humans to inspect the whole system, and a benchmark harness that A/B tests
+    NeuroMem against plain RAG on realistic scenarios.
+  </p>
+</section>
+
+<!-- 3. MEMORY MODEL -->
+<section id="memory-model">
+  <h2 data-num="03">The memory model</h2>
+  <p>
+    NeuroMem stores three <em>kinds</em> of memory, plus a graph of relationships between them. This mirrors the
+    distinction cognitive science draws between <strong>episodic</strong>, <strong>semantic</strong>, and <strong>procedural</strong> memory —
+    though the goal here is useful engineering behaviour, not biological accuracy.
+  </p>
+
+  <h3>Episodic — "something that happened"</h3>
+  <p>
+    A specific event with time and context. When you tell the agent "we deployed v4.7 this morning at 9am,"
+    that becomes an episodic memory. Every agent turn is also stored as an episodic memory — the raw record of
+    the interaction, which later becomes the source of consolidation.
+  </p>
+  <pre><code>{
+  "id": "epi_01M03F76P3SQW09FAPR1Z5CZ55",
+  "memory_type": "episodic",
+  "content": "OpenSearch deployment failed because vm.max_map_count was set to 65530.",
+  "event": "opensearch_failure",
+  "event_timestamp": "2026-08-15T14:07:00Z",
+  "importance": 0.85,
+  "confidence": 0.95
+}</code></pre>
+
+  <h3>Semantic — "something durable that's true"</h3>
+  <p>
+    A generalised fact, extracted from one or more episodic events. Where episodic memories are dated and specific,
+    semantic memories are stable. "The user prefers Rust for new microservices" is semantic. "The user said on
+    Tuesday they prefer Rust" is episodic.
+  </p>
+
+  <h3>Procedural — "how to do something"</h3>
+  <p>
+    A reusable procedure — how to fix a bug, how to deploy a service, how to run a test suite. Includes ordered
+    <code>steps</code>, <code>preconditions</code>, and — critically — <code>success_count</code>, <code>failure_count</code>,
+    and <code>success_rate</code>. A procedure that has worked 15 times ranks higher than one that has failed 3 times.
+  </p>
+
+  <h3>Relationships — "how ideas connect"</h3>
+  <p>
+    Every memory can be linked to any other memory via one of ten relationship types. This is the graph that turns
+    memory from a bag of documents into an <em>associative</em> structure.
+  </p>
+  <table>
+    <thead><tr><th>Relationship</th><th>Meaning</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>DERIVED_FROM</code></td><td>A memory came from another memory</td><td>Semantic fact derived from an episodic event</td></tr>
+      <tr><td><code>SUPERSEDES</code></td><td>A newer memory replaces an older one</td><td>"Now prefers Qdrant" supersedes "prefers OpenSearch"</td></tr>
+      <tr><td><code>CONTRADICTS</code></td><td>Two memories cannot both be true</td><td>Postmortem contradicts initial blame</td></tr>
+      <tr><td><code>CAUSED_BY</code></td><td>One event was the cause of another</td><td>500 errors CAUSED_BY k8s upgrade</td></tr>
+      <tr><td><code>RESULTED_IN</code></td><td>An event led to a downstream event</td><td>Recovery RESULTED_IN postmortem</td></tr>
+      <tr><td><code>PRECEDES</code></td><td>Timeline ordering</td><td>Discovery PRECEDES fix attempt</td></tr>
+      <tr><td><code>REINFORCES</code></td><td>Second event confirms a pattern</td><td>Redis outage REINFORCES the async-pool leak pattern</td></tr>
+      <tr><td><code>RELATED_TO</code></td><td>Loose association</td><td>Two Redis incidents RELATED_TO each other</td></tr>
+      <tr><td><code>SUPPORTS</code></td><td>Evidence for another memory</td><td>Log analysis SUPPORTS the root cause hypothesis</td></tr>
+      <tr><td><code>USED_BY</code></td><td>A resource used by an action</td><td>Fix procedure USED_BY the resolution event</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4. RETRIEVAL -->
+<section id="retrieval">
+  <h2 data-num="04">The retrieval pipeline</h2>
+  <p class="lede">
+    When a query comes in, NeuroMem doesn't ask "which document is most similar?" It asks six different questions
+    and blends the answers. This is the core of what makes it not-RAG.
+  </p>
+
+  <div class="ascii">     query text
+       |
+       v
++------+------+          +---------------------+
+| embed query |          | Full agent context  |
+| (OpenAI 3-  |          | passed to the LLM   |
+| large)      |          +---------^-----------+
++------+------+                    |
+       |                           |
+       v                           |
++------+---------------------------+-----+
+|  semantic search (k-NN, OpenSearch)     |
+|  keyword search  (BM25 multi_match)     |
+|  union candidates by memory ID          |
++------+----------------------------------+
+       |
+       v
++------+----------------------------------+
+|  fetch full documents via mget          |
+|  fetch relationships for candidate set  |
+|  compute 6 signal scores per memory     |
+|  weighted sum → final score             |
++------+----------------------------------+
+       |
+       v
+    top-K with Explanation object attached</div>
+
+  <h3>The six signals</h3>
+  <table>
+    <thead><tr><th>Signal</th><th class="num">Weight</th><th>What it measures</th></tr></thead>
+    <tbody>
+      <tr><td><span class="pill">semantic</span></td><td class="num">0.40</td><td>Cosine similarity via OpenSearch k-NN on 3072-dim OpenAI embeddings</td></tr>
+      <tr><td><span class="pill">keyword</span></td><td class="num">0.15</td><td>BM25 match on content and type-specific fields, normalised by the result set max</td></tr>
+      <tr><td><span class="pill">importance</span></td><td class="num">0.20</td><td>Author-supplied score reflecting how much this memory should matter</td></tr>
+      <tr><td><span class="pill">recency</span></td><td class="num">0.10</td><td><code>exp(-λ · age_days)</code> since <code>created_at</code></td></tr>
+      <tr><td><span class="pill">activation</span></td><td class="num">0.10</td><td><code>activation · exp(-λ · age_days_since_last_access)</code></td></tr>
+      <tr><td><span class="pill">relationship</span></td><td class="num">0.05</td><td>Boost when two candidates share an edge in the graph</td></tr>
+    </tbody>
+  </table>
+
+  <div class="formula">
+    score <span class="op">=</span>
+    semantic <span class="op">×</span> <span class="weight">0.40</span> <span class="op">+</span>
+    keyword <span class="op">×</span> <span class="weight">0.15</span> <span class="op">+</span>
+    importance <span class="op">×</span> <span class="weight">0.20</span> <span class="op">+</span>
+    recency <span class="op">×</span> <span class="weight">0.10</span> <span class="op">+</span>
+    activation <span class="op">×</span> <span class="weight">0.10</span> <span class="op">+</span>
+    relationship <span class="op">×</span> <span class="weight">0.05</span>
+  </div>
+
+  <blockquote class="alt">
+    <span class="label">Explanation is a feature, not a debug field</span>
+    <p>
+      Every recall response includes an <code>Explanation</code> object showing all six component scores per result,
+      plus the weights that produced the final score. The Retrieval Trace tab in the dashboard renders these as a bar
+      chart. You can always answer <em>"why did that memory win?"</em>
+    </p>
+  </blockquote>
+</section>
+
+<!-- 5. LIFECYCLE -->
+<section id="lifecycle">
+  <h2 data-num="05">Cognitive lifecycle</h2>
+  <p>
+    Retrieval isn't just a read operation — it's a signal that a memory was useful. NeuroMem uses that signal in
+    two ways: strengthening what gets used, and decaying what doesn't.
+  </p>
+
+  <h3>Strengthening (§18 of the plan)</h3>
+  <p>
+    After every recall, the top-K memories have their <code>activation</code> bumped and <code>access_count</code>
+    incremented. This is a fire-and-forget background task — the API response returns immediately, and the
+    strengthening happens on the next tick via an OpenSearch bulk painless script that updates all top-K memories in
+    a single round-trip.
+  </p>
+  <pre><code>ctx._source.activation = Math.min(1.0, ctx._source.activation + params.bump);
+ctx._source.access_count = ctx._source.access_count + 1;
+ctx._source.last_accessed_at = params.now;</code></pre>
+
+  <h3>Decay (§19 of the plan)</h3>
+  <p>
+    Decay is computed <em>at query time</em>, never persisted. During ranking, the <code>activation</code> signal is
+    multiplied by an exponential decay factor based on time since last access. A memory that was strong last year
+    but has never been retrieved since will have a low <em>effective</em> activation today — but its stored
+    <code>activation</code> field is unchanged.
+  </p>
+  <div class="formula">
+    effective_activation <span class="op">=</span>
+    activation <span class="op">×</span> exp<span class="op">(</span>−λ <span class="op">×</span> days_since_last_access<span class="op">)</span>
+  </div>
+
+  <blockquote>
+    <span class="label">No deletes, ever</span>
+    <p>
+      Superseded, contradicted, and decayed memories all stay queryable. The ranking is the only lever — old
+      memories just get pushed down. A dashboard can filter or highlight them; a research script can dig them up
+      for postmortem inspection.
+    </p>
+  </blockquote>
+</section>
+
+<!-- 6. CONSOLIDATION -->
+<section id="consolidation">
+  <h2 data-num="06">Consolidation</h2>
+  <p class="lede">
+    Not every conversation deserves permanent memory. Consolidation is the step where an LLM looks at a completed
+    agent turn and decides what — if anything — is worth remembering forever.
+  </p>
+
+  <h3>The pipeline</h3>
+  <ol>
+    <li>The agent finishes a turn. Its extraction node emits a list of <code>MemoryCandidate</code> objects — each classified as <code>EPISODIC</code>, <code>SEMANTIC</code>, <code>PROCEDURAL</code>, or <code>IGNORE</code>.</li>
+    <li>The turn itself is persisted as a single source <code>EpisodicMemory</code> — this is what derived memories will point to via <code>DERIVED_FROM</code>.</li>
+    <li>For each non-IGNORE candidate, NeuroMem searches the existing memory graph for semantically-similar existing memories.</li>
+    <li>If any are close enough, a second LLM call adjudicates — is the new candidate a <code>DUPLICATE</code>, does it <code>SUPERSEDE</code> the existing one, does it <code>CONTRADICT</code> it, or is it <code>INDEPENDENT</code>?</li>
+    <li>Duplicates are skipped. All other outcomes create a new memory row plus the appropriate relationship edge to the pre-existing one. <strong>The old memory is never modified.</strong></li>
+    <li>Every new memory also gets a <code>DERIVED_FROM</code> edge back to the source turn — one hop always gets you from a fact to the conversation that produced it.</li>
+  </ol>
+
+  <blockquote class="warm">
+    <span class="label">Never overwrite</span>
+    <p>
+      When you say "I switched to Qdrant," NeuroMem doesn't delete the old "prefers OpenSearch" fact and replace it.
+      It creates a <code>SUPERSEDES</code> edge from the new memory to the old. Both stay in the graph. Ranking pushes
+      the old one down; the dashboard can display the transition; a future query can walk backwards through
+      the history if it needs to.
+    </p>
+  </blockquote>
+
+  <h3>Async and non-blocking</h3>
+  <p>
+    Consolidation runs in the background so the user gets their response immediately. When you chat with the agent,
+    the response comes back after the answer node finishes; a fire-and-forget task pushes the extracted candidates
+    onto an <code>asyncio.Queue</code>, and a worker drains it. Errors in consolidation never fail the user's turn.
+  </p>
+</section>
+
+<!-- 7. AGENT -->
+<section id="agent">
+  <h2 data-num="07">The agent loop</h2>
+  <p>
+    The agent is a <strong>LangGraph state machine</strong> with seven nodes. Each node reads and writes to a shared
+    <code>AgentState</code> dictionary. The graph shape matches the plan §12 exactly — three of the nodes are
+    passthroughs in the current phase (reserved for future tool use), but the plumbing is in place.
+  </p>
+
+  <div class="ascii">START ─▶ classify_request ─▶ recall_memory ─▶ plan ─▶ execute_tools
+                                                       │
+                                                       ▼
+END ◀── memory_candidate_extraction ◀── answer ◀── evaluate_result</div>
+
+  <table>
+    <thead><tr><th>Node</th><th>Role</th><th>LLM used</th></tr></thead>
+    <tbody>
+      <tr><td><code>classify_request</code></td><td>Reformulates the user's message into a concise search query and a one-line goal</td><td>gpt-4o-mini (JSON mode, temp=0)</td></tr>
+      <tr><td><code>recall_memory</code></td><td>Calls the retrieval pipeline and attaches results to state</td><td>—</td></tr>
+      <tr><td><code>plan</code></td><td>Passthrough (reserved for planning logic)</td><td>—</td></tr>
+      <tr><td><code>execute_tools</code></td><td>Passthrough (reserved for tool calls)</td><td>—</td></tr>
+      <tr><td><code>evaluate_result</code></td><td>Passthrough (reserved for tool result evaluation)</td><td>—</td></tr>
+      <tr><td><code>answer</code></td><td>Generates the final response using the recalled memories as context</td><td>gpt-4o (temp=0.2)</td></tr>
+      <tr><td><code>memory_candidate_extraction</code></td><td>Looks at the turn and emits candidates for consolidation (does not persist)</td><td>gpt-4o-mini (JSON mode)</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote class="alt">
+    <span class="label">Extraction never persists</span>
+    <p>
+      The plan is explicit: <em>the LLM must never directly write to storage</em>. It only proposes. The Memory Engine
+      validates and persists — that separation of concerns is enforced by keeping extraction and consolidation in
+      separate processes with a queue between them.
+    </p>
+  </blockquote>
+</section>
+
+<!-- 8. ARCHITECTURE -->
+<section id="architecture">
+  <h2 data-num="08">Architecture</h2>
+  <p class="lede">
+    Three physical layers: your homelab OpenSearch cluster, the FastAPI + LangGraph runtime, and OpenAI. Every
+    layer is behind a Protocol so it can be swapped without touching the rest.
+  </p>
+
+  <div class="ascii">                     ┌──────────────────────────┐
+                     │     Dell OptiPlex        │
+                     │                          │
+                     │  OpenSearch 2.16+        │
+                     │  3-node cluster          │
+                     │  homelab-opensearch      │
+                     │  https://192.168.1.208   │
+                     │    :9200  API            │
+                     │    :5601  Dashboards     │
+                     │                          │
+                     │  Indexes:                │
+                     │    neuromem-episodic     │
+                     │    neuromem-semantic     │
+                     │    neuromem-procedural   │
+                     │    neuromem-relationships│
+                     └────────────┬─────────────┘
+                                  │
+                                  │ LAN (HTTPS, basic auth)
+                                  │
+                     ┌────────────┴─────────────┐
+                     │   Jetson Orin Nano       │
+                     │                          │
+                     │  memory_api  (FastAPI)   │
+                     │    :8000                 │
+                     │  dashboard   (Streamlit) │
+                     │    :8501                 │
+                     └────────────┬─────────────┘
+                                  │
+                                  │ HTTPS
+                                  ▼
+                          ┌───────────────┐
+                          │  OpenAI API   │
+                          │  gpt-4o       │
+                          │  gpt-4o-mini  │
+                          │  embedding-3  │
+                          └───────────────┘</div>
+
+  <h3>Component layers</h3>
+  <table>
+    <thead><tr><th>Layer</th><th>Where</th><th>Responsibility</th></tr></thead>
+    <tbody>
+      <tr><td>Config</td><td><code>memory/config.py</code></td><td>Pydantic-settings; single source of truth for every knob</td></tr>
+      <tr><td>Adapters</td><td><code>models/</code></td><td><code>OpenAIProvider</code> + <code>OpenAIEmbeddingProvider</code> behind Protocols with batching, retry, dimension assertion</td></tr>
+      <tr><td>Domain</td><td><code>memory/domain/</code></td><td>Pydantic discriminated union of <code>EpisodicMemory</code> / <code>SemanticMemory</code> / <code>ProceduralMemory</code>, plus <code>Relationship</code></td></tr>
+      <tr><td>Storage</td><td><code>memory/storage/</code></td><td><code>MemoryStore</code> Protocol + <code>OpenSearchMemoryStore</code> — all k-NN, BM25, mget, bulk painless updates</td></tr>
+      <tr><td>Retrieval</td><td><code>memory/retrieval/</code></td><td>Ranking helpers, <code>RankWeights</code>, <code>RecallQuery</code>, <code>RecallResponse</code>, <code>Explanation</code></td></tr>
+      <tr><td>Service facade</td><td><code>memory/service.py</code></td><td>Orchestrates recall, schedules strengthening, computes decay, stats, search, timeline, graph</td></tr>
+      <tr><td>Consolidation</td><td><code>memory/consolidation/</code></td><td>Job envelope, LLM-driven adjudication, in-process <code>asyncio.Queue</code> + worker</td></tr>
+      <tr><td>Agent</td><td><code>apps/agent/</code></td><td>LangGraph state + node closures. Zero direct storage calls</td></tr>
+      <tr><td>Memory API</td><td><code>apps/memory_api/</code></td><td>FastAPI application factory + all HTTP routes. Lifespan owns clients and the consolidation worker</td></tr>
+      <tr><td>Dashboard</td><td><code>apps/dashboard/</code></td><td>Streamlit UI with six tabs — talks only over HTTP to <code>memory_api</code></td></tr>
+      <tr><td>Experiments</td><td><code>experiments/</code></td><td>Scenario loader, RAG vs NeuroMem modes, metrics, markdown report generator</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 9. TECHNOLOGY STACK -->
+<section id="tech-stack">
+  <h2 data-num="09">Technology stack — what each thing does and why</h2>
+
+  <div class="grid two">
+    <div class="card">
+      <h4>Python 3.12</h4>
+      <p>
+        Modern type hints (<code>Literal</code>, discriminated unions), <code>match</code> statements, strict async/await.
+        Chosen for the depth of ML/LLM library support and the plan's explicit constraint.
+      </p>
+    </div>
+    <div class="card">
+      <h4>FastAPI</h4>
+      <p>
+        Async HTTP framework with automatic OpenAPI generation. Every route is Pydantic-validated on both request and
+        response. The <code>lifespan</code> context manager owns the OpenSearch client, OpenAI client, and the
+        consolidation worker task.
+      </p>
+    </div>
+    <div class="card">
+      <h4>Pydantic v2 (with <code>extra=&quot;forbid&quot;</code>)</h4>
+      <p>
+        Every domain model rejects unknown fields. This mirrors OpenSearch's <code>dynamic: strict</code> mapping so
+        schema drift fails fast at both edges. Discriminated unions on <code>memory_type</code> let a single
+        <code>POST /memory/store</code> handler serve all three types.
+      </p>
+    </div>
+    <div class="card">
+      <h4>OpenSearch (k-NN plugin)</h4>
+      <p>
+        Four indexes on a 3-node cluster: episodic, semantic, procedural, relationships. <em>k-NN vector search</em>
+        for semantic similarity, <em>BM25 multi_match</em> for keyword, <em>bulk painless scripts</em> for atomic
+        strengthening writes, <em>aggregations</em> for dashboard stats. Chosen over pgvector or Qdrant for the
+        first-class hybrid search story.
+      </p>
+    </div>
+    <div class="card alt">
+      <h4>LangGraph</h4>
+      <p>
+        Node-based state machine with typed <code>AgentState</code> as a TypedDict. Each node is an async closure
+        that reads and writes state. Version 1.x's type system fights us occasionally, but the runtime is exactly
+        what a memory-driven agent needs.
+      </p>
+    </div>
+    <div class="card alt">
+      <h4>OpenAI API</h4>
+      <p>
+        Two chat models: <code>gpt-4o-mini</code> for classification and extraction (JSON mode, temp=0), <code>gpt-4o</code> for
+        reasoning and answer generation. One embedding model: <code>text-embedding-3-large</code> at native 3072
+        dimensions. Same async client instance is shared across chat and embeddings.
+      </p>
+    </div>
+    <div class="card">
+      <h4>Streamlit + pyvis</h4>
+      <p>
+        Six-tab dashboard talking only over HTTP. <em>Overview</em> (stats cards),
+        <em>Memory Explorer</em> (search + inspect), <em>Graph</em> (pyvis network with color-coded types),
+        <em>Timeline</em> (chronological table), <em>Retrieval Trace</em> (per-signal contribution bar chart),
+        <em>Consolidation Trace</em> (dynamic candidate editor).
+      </p>
+    </div>
+    <div class="card">
+      <h4>uv + pyproject.toml</h4>
+      <p>
+        Modern Python packaging. Single lockfile, hermetic sync, ARM-friendly for Jetson deployment. <code>ruff</code>
+        for lint + format, <code>mypy</code> in strict mode for typechecking, <code>pytest</code> for the test suite.
+      </p>
+    </div>
+    <div class="card">
+      <h4>ULID + prefix routing</h4>
+      <p>
+        Memory IDs are ULID-based with a type prefix: <code>epi_</code>, <code>sem_</code>, <code>pro_</code>,
+        <code>rel_</code>. A pure string function routes any ID to the correct OpenSearch index — no lookup
+        roundtrip needed.
+      </p>
+    </div>
+    <div class="card">
+      <h4>structlog</h4>
+      <p>
+        Structured JSON logs with contextvars for <code>request_id</code>, <code>agent_id</code>, and
+        <code>memory_id</code>. Every memory lifecycle event produces a structured log line, feeding future
+        observability tooling.
+      </p>
+    </div>
+    <div class="card warm">
+      <h4>Async everywhere</h4>
+      <p>
+        <code>aiohttp</code>-backed OpenSearch client, async OpenAI client, async FastAPI, async LangGraph nodes,
+        <code>asyncio.Queue</code> for the consolidation worker. Fire-and-forget tasks tracked in a set so they can't
+        be garbage-collected mid-execution.
+      </p>
+    </div>
+    <div class="card warm">
+      <h4>Docker Compose</h4>
+      <p>
+        Two-service deployment on the Jetson: <code>memory_api</code> and <code>dashboard</code>. Both point at the
+        externally-provisioned OpenSearch cluster on the OptiPlex via LAN. No infrastructure duplication.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- 10. EVALUATION -->
+<section id="evaluation">
+  <h2 data-num="10">Evaluation — does it actually work?</h2>
+  <p class="lede">
+    The whole point of the project is to answer whether NeuroMem beats vanilla RAG. Phase 6 built an A/B benchmark
+    harness that runs the same scenarios through both approaches and produces a markdown report.
+  </p>
+
+  <h3>The harness</h3>
+  <p>
+    Scenarios live as YAML files under <code>experiments/scenarios/</code>. Each scenario declares a set of memories
+    to seed, optionally a set of relationships to create between them, and a list of queries with expected outcomes
+    (substring-based). The runner:
+  </p>
+  <ol>
+    <li>Generates a unique <code>run_id</code> for isolation (marker is templated into every memory + query).</li>
+    <li>Seeds all memories via the real <code>MemoryService.create_memory</code> — auto-embeds via OpenAI.</li>
+    <li>Seeds all relationships via <code>create_relationship</code>.</li>
+    <li>Runs each query through <strong>both</strong> modes:
+      <ul>
+        <li><em>rag</em> mode: naive k-NN semantic search only, then LLM answer.</li>
+        <li><em>neuromem</em> mode: full 6-signal <code>MemoryService.recall</code>, then <strong>identical</strong> LLM answer prompt.</li>
+      </ul>
+    </li>
+    <li>Scores each result on 8 metrics: <code>precision_at_k</code>, <code>recall_hit</code>, <code>top1_match</code>, <code>answer_hit</code>, forbidden-substring detection, count of irrelevant retrievals, retrieval latency, and answer latency.</li>
+    <li>Writes a timestamped markdown report with aggregate stats + per-query detail + sample answers.</li>
+  </ol>
+
+  <h3>Current scenario library</h3>
+  <table>
+    <thead><tr><th>ID</th><th>What it tests</th></tr></thead>
+    <tbody>
+      <tr><td><code>001–005</code></td><td>Original 5 baseline scenarios (OpenSearch preference, Jetson deployment, embedding-model change, deployment failure, resolution)</td></tr>
+      <tr><td><code>006</code></td><td>asyncio blocking-I/O bug — symptom to root cause to procedural fix</td></tr>
+      <tr><td><code>007</code></td><td>Container OOM (exit code 137) — two-part fix required</td></tr>
+      <tr><td><code>008</code></td><td>CORS misconfiguration — browser-only symptom with no matching backend logs</td></tr>
+      <tr><td><code>009</code></td><td>Superseded fix — old best practice vs new</td></tr>
+      <tr><td><code>010</code></td><td>Multi-symptom / single root cause — two different errors, same underlying issue</td></tr>
+      <tr><td><code>011</code></td><td>Flagship: production connection pool cascade (12 memories, 11 relationships, 6 queries)</td></tr>
+      <tr><td><code>012</code></td><td>The Great Kubernetes 1.29 Cascade (20 memories, 23 relationships, 8 queries, 8 of 10 relationship types exercised)</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Real numbers from the last full run</h3>
+  <div class="grid">
+    <div class="card accent">
+      <div class="stat-hint">Unit tests</div>
+      <div class="stat">147</div>
+      <div class="stat-hint">passing</div>
+    </div>
+    <div class="card accent">
+      <div class="stat-hint">Integration tests</div>
+      <div class="stat">12</div>
+      <div class="stat-hint">against live cluster</div>
+    </div>
+    <div class="card accent">
+      <div class="stat-hint">Source files</div>
+      <div class="stat">44</div>
+      <div class="stat-hint">mypy strict clean</div>
+    </div>
+    <div class="card accent">
+      <div class="stat-hint">Ruff</div>
+      <div class="stat">✓</div>
+      <div class="stat-hint">lint + format</div>
+    </div>
+  </div>
+
+  <h3>Head-to-head on the flagship scenario (K8s 1.29 cascade)</h3>
+  <table>
+    <thead><tr><th>Mode</th><th class="num">P@K</th><th class="num">Recall</th><th class="num">Top-1</th><th class="num">Answer ✓</th><th class="num">Retr. ms</th></tr></thead>
+    <tbody>
+      <tr><td><code>neuromem</code></td><td class="num">0.458</td><td class="num">1.000</td><td class="num">6/8</td><td class="num">7/8</td><td class="num">467</td></tr>
+      <tr><td><code>rag</code></td><td class="num">0.458</td><td class="num">1.000</td><td class="num">7/8</td><td class="num">7/8</td><td class="num">316</td></tr>
+    </tbody>
+  </table>
+
+  <blockquote>
+    <span class="label">Where NeuroMem wins clearly</span>
+    <p>
+      Multi-hop reasoning queries — where the answer requires connecting distant memories through the relationship
+      graph. On q7 of scenario 012 ("how were the mTLS cert issue and the Redis outage connected?"), NeuroMem's
+      precision was <strong>double</strong> RAG's, and its answer used the exact synthesized phrase "compound root
+      cause" from the semantic memory, while RAG paraphrased from raw episodic events.
+    </p>
+  </blockquote>
+
+  <blockquote class="warm">
+    <span class="label">Where NeuroMem regressed</span>
+    <p>
+      Timeline / sequence questions. On q4 of scenario 012 ("what order were the layers discovered?"), the
+      activation-based ranking demoted the oldest event (mTLS) out of top-8. This is a real weakness — the current
+      lifecycle-aware ranking penalises exactly the memories a "what happened first" query needs. The fix is
+      per-query weight overrides, which is a documented next step.
+    </p>
+  </blockquote>
+</section>
+
+<!-- 11. END-TO-END FLOW -->
+<section id="end-to-end">
+  <h2 data-num="11">End-to-end flow — a single conversation</h2>
+  <p>
+    Here's what happens when you send one message to the agent. Every arrow is a real function call in the running
+    system.
+  </p>
+
+  <div class="ascii">User → POST /agent/chat { message, conversation_id }
+                            │
+                            ▼
+                LangGraph agent starts
+                            │
+              ┌─────────────┼─────────────────┐
+              ▼             ▼                 ▼
+    classify_request   recall_memory      answer node
+      gpt-4o-mini       MemoryService     gpt-4o
+      JSON mode         .recall()         with recalled context
+              │             │                 │
+              │      k-NN + BM25 + rank       │
+              │      strengthening scheduled   │
+              │      (fire-and-forget)         │
+              │             │                 │
+              └─────────────┴─────────────────┘
+                            │
+                            ▼
+              memory_candidate_extraction
+              gpt-4o-mini, JSON mode
+                            │
+                            ▼
+                   Response returned to user
+                (consolidation_queued: true)
+                            │
+                            │  (background)
+                            ▼
+              ConsolidationQueue.enqueue
+                            │
+                            ▼
+                    Worker picks up job
+                            │
+                            ▼
+              Create source episodic memory
+                            │
+                            ▼
+              For each non-IGNORE candidate:
+                search near-neighbours
+                LLM adjudicates DUPLICATE
+                  / SUPERSEDES / CONTRADICTS
+                  / INDEPENDENT
+                write memory + DERIVED_FROM edge
+                write conflict edge if applicable</div>
+</section>
+
+<!-- 12. DESIGN DECISIONS -->
+<section id="decisions">
+  <h2 data-num="12">The load-bearing design decisions</h2>
+  <p>
+    Ten decisions that shape everything else in the system. Each of these has downstream consequences that would
+    be expensive to revisit.
+  </p>
+
+  <ol>
+    <li><strong>Never overwrite a memory.</strong> Conflicting facts get <code>SUPERSEDES</code> or <code>CONTRADICTS</code> edges; the old row stays queryable. Decay is query-time only. No deletes, ever.</li>
+    <li><strong>ULID-prefixed IDs</strong> (<code>epi_</code>, <code>sem_</code>, <code>pro_</code>, <code>rel_</code>) route to the correct index as a pure string function. No lookup roundtrip.</li>
+    <li><strong><code>extra=&quot;forbid&quot;</code> on every Pydantic model</strong> mirrors OpenSearch's <code>dynamic: strict</code> mapping. Schema drift fails fast on both sides.</li>
+    <li><strong>Discriminated union for Memory</strong> on <code>memory_type</code>. One endpoint serves all three types; <code>TypeAdapter</code> dispatches on read.</li>
+    <li><strong>Explanation is a first-class field</strong>, not a debug hint. The dashboard's Retrieval Trace tab renders per-signal contributions directly from it.</li>
+    <li><strong>Bulk painless <code>_bulk</code> script</strong> for strengthening: one round-trip bumps activation + access_count + last_accessed_at atomically per doc.</li>
+    <li><strong>Two-model LLM adapter, one client</strong>: <code>gpt-4o-mini</code> for extraction/classification (JSON mode, temp=0), <code>gpt-4o</code> for reasoning.</li>
+    <li><strong>Route ordering matters in FastAPI</strong>. Literal <code>/memory/stats</code> and friends declared before <code>/memory/{memory_id}</code> to avoid the wildcard swallowing them.</li>
+    <li><strong>Evaluation isolation via per-run <code>{run_id}</code> markers</strong> in seeded memory content, not deletes. Runs coexist forever; the report includes the run IDs so you can dig up any specific one.</li>
+    <li><strong>The agent depends on <code>MemoryService</code>, not <code>MemoryStore</code>.</strong> Storage can be swapped without touching the graph, and consolidation reuses the same facade the routes see.</li>
+  </ol>
+</section>
+
+<!-- 13. FUTURE -->
+<section id="future">
+  <h2 data-num="13">What's next</h2>
+  <p>
+    The POC is feature-complete against its plan. The natural extensions fall into three categories.
+  </p>
+
+  <div class="grid two">
+    <div class="card">
+      <h4>Deeper reasoning</h4>
+      <p>
+        Multi-hop relationship traversal beyond depth 3. Cross-encoder reranking for the top-K. Learned or
+        RLHF-tuned ranking weights instead of the fixed baseline. Per-query weight overrides so scenarios can
+        specify "for this question, downweight activation."
+      </p>
+    </div>
+    <div class="card">
+      <h4>Better isolation</h4>
+      <p>
+        Multi-tenant memory scoping (currently single global pool). Per-repository memory namespaces for a
+        software-engineering agent. Automatic pruning of stale eval-run memories to keep the shared cluster clean.
+      </p>
+    </div>
+    <div class="card">
+      <h4>Domain adaptation</h4>
+      <p>
+        The scenarios already lean toward software debugging. Adding a diagnose endpoint that takes an error
+        message + stack trace + repo context and returns ranked fix procedures with success rates would turn this
+        into a real coding-agent memory backend.
+      </p>
+    </div>
+    <div class="card">
+      <h4>Beyond OpenAI</h4>
+      <p>
+        Every LLM and embedding call is behind a Protocol. Swapping to a local model on the Jetson (llama.cpp,
+        vLLM) is a two-file change. The plan explicitly reserves this direction.
+      </p>
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  NeuroMem — technical overview generated 2026-08-16.
+</footer>
+
+</main>
+</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,53 @@
+id: "008-cors-frontend-bug"
+title: "Streamlit dashboard blocked by CORS"
+description: >
+  Frontend can't reach the API from a different origin. Tests recall of a
+  browser-only symptom that has no matching stack trace in the backend logs
+  and a specific FastAPI fix.
+
+memories:
+  - memory_type: episodic
+    content: >-
+      For run {run_id}, the Streamlit dashboard on 8501 failed to POST to
+      memory_api on 8000 with 'CORS policy: No Access-Control-Allow-Origin
+      header'. The backend logs showed no request at all, only a preflight
+      OPTIONS that was rejected.
+    event: "cors_preflight_failure"
+    importance: 0.75
+    confidence: 0.95
+
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, when a browser POST is met with 'No
+      Access-Control-Allow-Origin' the FastAPI backend never processes the
+      request because it fails the preflight OPTIONS check. Backend logs
+      will look empty even though the frontend is trying.
+    subject: "cors_preflight_semantics"
+    importance: 0.85
+    confidence: 0.95
+
+  - memory_type: procedural
+    content: >-
+      For run {run_id}, to fix CORS in FastAPI add CORSMiddleware in the app
+      factory - app.add_middleware(CORSMiddleware, allow_origins=[frontend_url],
+      allow_methods=[*], allow_headers=[*]). Keep allow_origins specific in
+      production; only use [*] for local dev.
+    name: "fix_fastapi_cors"
+    importance: 0.9
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, my frontend can't reach the API but the backend logs show nothing. Why?"
+    top_k: 5
+    expected_top_content_contains: ["cors", "preflight", "options"]
+    expected_recall_contains_any: ["cors", "preflight", "OPTIONS", "Access-Control-Allow-Origin"]
+    expected_answer_contains: ["cors"]
+    expected_answer_missing: ["firewall", "dns"]
+
+  - id: "q2"
+    question: "For run {run_id}, how do I enable CORS in FastAPI?"
+    top_k: 5
+    expected_top_content_contains: ["corsmiddleware", "add_middleware"]
+    expected_recall_contains_any: ["CORSMiddleware", "add_middleware"]
+    expected_answer_contains: ["corsmiddleware"]

@@ -1,0 +1,33 @@
+id: "004-opensearch-failure"
+title: "User encounters OpenSearch failure"
+description: >
+  User reports a specific OpenSearch deployment failure. Agent should retrieve
+  and describe it.
+
+memories:
+  - memory_type: episodic
+    content: "For run {run_id}, the OpenSearch deployment failed because vm.max_map_count was set to the default 65530 and OpenSearch requires at least 262144."
+    event: "opensearch_failure"
+    importance: 0.85
+    confidence: 0.95
+
+  - memory_type: semantic
+    content: "For run {run_id}, OpenSearch requires the host kernel to allow at least 262144 memory-mapped areas per process."
+    subject: "opensearch_requirement"
+    importance: 0.8
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, why did my OpenSearch deployment fail?"
+    top_k: 5
+    expected_top_content_contains: ["vm.max_map_count", "map"]
+    expected_recall_contains_any: ["vm.max_map_count", "map_count", "262144"]
+    expected_answer_contains: ["vm.max_map_count"]
+
+  - id: "q2"
+    question: "For run {run_id}, what value does vm.max_map_count need?"
+    top_k: 5
+    expected_top_content_contains: ["262144"]
+    expected_recall_contains_any: ["262144"]
+    expected_answer_contains: ["262144"]

@@ -1,0 +1,34 @@
+id: "001-opensearch-preference"
+title: "User establishes OpenSearch preference"
+description: >
+  User explicitly asserts OpenSearch as their vector store, then asks the agent
+  which one they are using.
+
+memories:
+  - memory_type: semantic
+    content: "For evaluation run {run_id}, the user has chosen OpenSearch as their vector database on the Dell OptiPlex."
+    subject: "vector_database"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.6
+  - memory_type: semantic
+    content: "For run {run_id}, the OpenSearch cluster has three nodes and is reachable at 192.168.1.208."
+    subject: "opensearch_cluster"
+    importance: 0.7
+    confidence: 0.9
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, which vector database am I using?"
+    top_k: 5
+    expected_top_content_contains: ["opensearch"]
+    expected_recall_contains_any: ["opensearch"]
+    expected_answer_contains: ["opensearch"]
+    expected_answer_missing: ["pinecone", "weaviate", "qdrant", "chroma"]
+
+  - id: "q2"
+    question: "For run {run_id}, how many OpenSearch nodes are in my cluster?"
+    top_k: 5
+    expected_top_content_contains: ["three", "nodes"]
+    expected_recall_contains_any: ["three", "nodes", "cluster"]
+    expected_answer_contains: ["three"]

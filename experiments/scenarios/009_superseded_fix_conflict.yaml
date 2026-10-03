@@ -1,0 +1,38 @@
+id: "009-superseded-fix-conflict"
+title: "Older fix superseded by newer best practice"
+description: >
+  A fix that used to be correct has been superseded by a modern one. Older
+  fact has low importance/activation; newer has high. NeuroMem's importance
+  + activation signals should promote the newer preference; naive RAG on
+  cosine alone often surfaces the older statement because both are
+  semantically similar.
+
+memories:
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, the historical way to silence 'pytest-asyncio: the
+      configuration option asyncio_mode is unset' was to set
+      asyncio_mode = strict in pyproject.toml.
+    subject: "pytest_asyncio_mode_old"
+    importance: 0.4
+    confidence: 0.9
+    activation: 0.2
+
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, the modern preferred setting is asyncio_mode = auto
+      because it auto-marks every 'async def test_' function as an
+      asyncio test - no more per-function @pytest.mark.asyncio decorators.
+    subject: "pytest_asyncio_mode_current"
+    importance: 0.95
+    confidence: 0.98
+    activation: 0.85
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, what asyncio_mode should I use with pytest-asyncio in a new project?"
+    top_k: 5
+    expected_top_content_contains: ["auto", "modern preferred", "asyncio_mode"]
+    expected_recall_contains_any: ["auto", "asyncio_mode"]
+    expected_answer_contains: ["auto"]
+    expected_answer_missing: []

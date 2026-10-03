@@ -1,0 +1,642 @@
+id: "012-k129-upgrade-cascade"
+title: "The Great Kubernetes 1.29 upgrade cascade — 14-hour compound outage"
+description: >
+  A production Kubernetes cluster upgrade from 1.28 to 1.29 triggered a
+  14-hour cascading outage across four services. The initial hypothesis
+  (blaming a morning app deployment) was wrong. The real root cause turned
+  out to be three simultaneous infra issues introduced by the upgrade:
+  mTLS certificate format change, kube-dns configuration incompatibility,
+  and Redis service-discovery API deprecation. Each was fixed one at a
+  time as the next-layer symptom emerged. 30 days later a similar-looking
+  Redis error appeared but with different symptom characteristics.
+
+  This scenario exercises: SUPERSEDES chains (early wrong theory replaced
+  by evolving understanding), CONTRADICTS edges (semantic memory of the
+  real root cause contradicts the initial blame), PRECEDES chains (layered
+  investigation as each fix uncovered the next symptom), CAUSED_BY /
+  DERIVED_FROM lineage across 14 episodic events, REINFORCES on recurrence,
+  and RESULTED_IN for postmortem publication.
+
+  Naive semantic RAG should struggle on queries that require:
+    - distinguishing the false lead (rolled-back deploy) from the truth
+    - synthesizing a three-part root cause from separate memories
+    - reasoning about sequence of investigation steps
+    - analogical transfer to a similar-but-distinct recurrence
+
+memories:
+  # -------------- EPISODIC: the 14-hour timeline --------------
+
+  - key: e01_upgrade_completion
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+0 the SRE team completed the prod-us-west-2
+      Kubernetes cluster upgrade from 1.28.6 to 1.29.1. All 47 nodes drained
+      and rejoined without initial errors. Control plane health checks were
+      green.
+    event: "k8s_upgrade_complete"
+    importance: 0.6
+    confidence: 0.98
+    activation: 0.4
+
+  - key: e02_checkout_500s
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+15min the checkout-svc began returning HTTP 500
+      errors on approximately 8 percent of requests. Error rate climbed
+      steadily. PagerDuty fired at T+22min. Traffic pattern was normal for
+      the time of day.
+    event: "checkout_500_symptom"
+    importance: 0.8
+    confidence: 0.98
+    activation: 0.55
+
+  - key: e03_false_blame_app_deploy
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+30min the on-call team blamed the morning
+      app-team deployment of checkout-svc v4.7.0 (shipped 2 hours earlier).
+      The deploy was rolled back to v4.6.9 within 15 minutes. The 500 error
+      rate did not improve at all after the rollback, proving the app
+      deploy was not the cause of the outage.
+    event: "app_deploy_rollback_false_lead"
+    importance: 0.55
+    confidence: 0.98
+    activation: 0.25
+
+  - key: e04_mtls_errors_ingress
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+1hr the SRE examined nginx-ingress logs and
+      found repeated 'x509: certificate signed by unknown authority' errors
+      on the checkout-svc backend upstream. The mTLS certificates had been
+      rotated by cert-manager but with a format the 1.29 ingress controller
+      no longer accepted.
+    event: "mtls_cert_errors_discovered"
+    importance: 0.85
+    confidence: 0.98
+    activation: 0.5
+
+  - key: e05_cert_regen_partial_fix
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+2hr the team regenerated the mTLS certs with
+      the new 1.29-compatible format using cert-manager v1.14. checkout-svc
+      500 rate dropped from 8 percent to 0.2 percent within 5 minutes.
+      However auth-svc immediately started failing readiness probes with a
+      different symptom: intermittent DNS resolution failures inside pods.
+    event: "mtls_fix_reveals_next_layer"
+    importance: 0.8
+    confidence: 0.98
+    activation: 0.5
+
+  - key: e06_dns_failures_investigation
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+3hr SRE exec'd into an auth-svc pod and ran
+      `dig kubernetes.default.svc.cluster.local` which returned SERVFAIL
+      intermittently. Reproduced from 4 different pods on different nodes.
+      Ruled out network policies; the issue was inside kube-dns itself.
+    event: "dns_reproduction_kube_dns"
+    importance: 0.8
+    confidence: 0.98
+    activation: 0.45
+
+  - key: e07_kube_dns_configmap_update
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+4hr the kube-dns Corefile configmap was
+      updated - the 1.29 upgrade required the `forward . /etc/resolv.conf`
+      stanza to include an explicit `max_concurrent 1000` parameter that
+      the 1.28 default provided implicitly. After configmap rollout auth-svc
+      and 8 other affected services recovered.
+    event: "kube_dns_configmap_fixed"
+    importance: 0.85
+    confidence: 0.98
+    activation: 0.55
+
+  - key: e08_inventory_db_pool_timeouts
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+6hr the inventory-svc began throwing
+      PostgreSQL connection timeout errors: 'connection pool exhausted -
+      no available connection after 30s wait'. Postgres itself was healthy
+      with plenty of available connection slots on the server side.
+    event: "inventory_db_pool_timeout_symptom"
+    importance: 0.75
+    confidence: 0.98
+    activation: 0.4
+
+  - key: e09_envoy_sidecar_diagnosis
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+7hr the platform team identified that Istio
+      envoy sidecars were injecting an outbound connection cap of 1024 that
+      was not present on 1.28. The inventory-svc DB pool was configured
+      with 2000 connections and hit the envoy cap first. Patched the
+      istio-proxy annotation `traffic.sidecar.istio.io/concurrency` to
+      raise the limit.
+    event: "envoy_sidecar_root_cause_found"
+    importance: 0.85
+    confidence: 0.98
+    activation: 0.5
+
+  - key: e10_redis_errors_persist
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+8hr the recommendations-svc continued throwing
+      Redis errors even after the envoy fix. The specific error was
+      'MOVED redirect but node unreachable at 10.244.5.31:6379'. Redis
+      cluster nodes were healthy and reachable from a debug pod, but the
+      client library kept getting stale IPs.
+    event: "redis_errors_after_envoy"
+    importance: 0.8
+    confidence: 0.98
+    activation: 0.45
+
+  - key: e11_redis_discovery_deprecation
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+10hr the DBRE team identified that the
+      recommendations-svc redis-py client was using the deprecated
+      Endpoints API for cluster discovery. 1.29 removed the compat
+      shim that had made this work despite the deprecation warning
+      posted 3 releases earlier. Migration to a headless-service
+      discovery pattern was needed.
+    event: "redis_discovery_api_deprecated_root_cause"
+    importance: 0.85
+    confidence: 0.98
+    activation: 0.55
+
+  - key: e12_redis_headless_migration
+    memory_type: episodic
+    content: >-
+      For run {run_id}, at T+12hr the recommendations-svc was patched to
+      use a headless Service (clusterIP: None) with StatefulSet-managed
+      DNS records for Redis cluster discovery instead of the deprecated
+      Endpoints polling. Full service recovery achieved. Total outage
+      duration was 12 hours 47 minutes across four services.
+    event: "redis_headless_full_recovery"
+    importance: 0.85
+    confidence: 0.98
+    activation: 0.6
+
+  - key: e13_postmortem_published
+    memory_type: episodic
+    content: >-
+      For run {run_id}, 7 days after the incident the SRE team published
+      the postmortem. Verdict: three simultaneous infra issues in the 1.29
+      upgrade compounded into one 14-hour cascade. The morning app deploy
+      was formally cleared of causation. Action items included a
+      pre-upgrade checklist and monitoring for the specific failure modes.
+    event: "postmortem_published"
+    importance: 0.9
+    confidence: 0.98
+    activation: 0.55
+
+  - key: e14_recurrence_30day
+    memory_type: episodic
+    content: >-
+      For run {run_id}, 30 days after the outage the recommendations-svc
+      threw Redis errors again but with different symptoms - this time
+      the error was 'ConnectionError: Timeout reading from socket' on
+      long-running queries, not MOVED redirect or discovery failures.
+      Redis was resource-starved from a bad query, not a discovery
+      regression. Different root cause despite similar-looking symptoms.
+    event: "redis_recurrence_but_different"
+    importance: 0.75
+    confidence: 0.95
+    activation: 0.4
+
+  # -------------- SEMANTIC: durable understanding --------------
+
+  - key: s01_triple_root_cause
+    memory_type: semantic
+    content: >-
+      For run {run_id}, the k8s 1.29 upgrade cascade had three
+      simultaneous infrastructure root causes that compounded into a
+      single visible outage: mTLS certificate format change requiring
+      cert-manager v1.14 regeneration, kube-dns Corefile requiring an
+      explicit max_concurrent stanza, and Redis service-discovery API
+      removal requiring migration to headless services. Each individual
+      fix uncovered the next layer.
+    subject: "k129_upgrade_triple_root_cause"
+    importance: 0.95
+    confidence: 0.98
+    activation: 0.75
+
+  - key: s02_app_deploy_was_not_cause
+    memory_type: semantic
+    content: >-
+      For run {run_id}, the checkout-svc v4.7.0 morning app deployment
+      was formally NOT the cause of the 1.29 outage despite coinciding
+      in time. Rolling it back had zero effect on the 500 error rate.
+      The team's initial blame of the app-team was incorrect and this
+      is documented in the postmortem verdict.
+    subject: "app_deploy_cleared_of_causation"
+    importance: 0.9
+    confidence: 0.98
+    activation: 0.7
+
+  - key: s03_layered_troubleshooting
+    memory_type: semantic
+    content: >-
+      For run {run_id}, when a k8s minor version upgrade breaks multiple
+      services simultaneously the correct mental model is compound root
+      cause, not single-issue. Fixing one layer will reveal the next
+      symptom. Expect to iterate: mTLS certs, DNS, service mesh sidecar
+      config, and API deprecations are the four most common categories.
+    subject: "compound_root_cause_pattern"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.6
+
+  - key: s04_redis_discovery_vs_timeout
+    memory_type: semantic
+    content: >-
+      For run {run_id}, Redis MOVED-redirect / discovery-failure errors
+      and Redis timeout errors have different root causes and different
+      fixes. Discovery failures usually indicate a client library or
+      service-discovery API problem. Timeout errors usually indicate
+      resource starvation or a bad query on the server side. Do not
+      apply a discovery fix to a timeout problem.
+    subject: "redis_discovery_vs_timeout_distinction"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.55
+
+  # -------------- PROCEDURAL: how-to knowledge --------------
+
+  - key: p01_regen_mtls_certs
+    memory_type: procedural
+    content: >-
+      For run {run_id}, to regenerate mTLS certs after a k8s 1.29 upgrade
+      run cert-manager v1.14 or later, force a rotation with
+      `kubectl cmctl renew --all-namespaces`, then verify the ingress
+      controller reload picked up new certs by tailing nginx-ingress logs
+      for `certificate signed by unknown authority` disappearance.
+    name: "regen_mtls_certs_for_129"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.55
+
+  - key: p02_update_kube_dns
+    memory_type: procedural
+    content: >-
+      For run {run_id}, to fix kube-dns SERVFAIL on 1.29 edit the coredns
+      Corefile configmap to add `max_concurrent 1000` in the forward
+      stanza, then `kubectl -n kube-system rollout restart deployment
+      coredns`. Verify with `dig kubernetes.default.svc.cluster.local`
+      from a debug pod.
+    name: "update_kube_dns_for_129"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.55
+
+  - key: p03_migrate_redis_headless
+    memory_type: procedural
+    content: >-
+      For run {run_id}, to migrate Redis client discovery off the
+      deprecated Endpoints API create a headless Service with
+      clusterIP None referencing a StatefulSet of Redis pods, then update
+      the client to resolve nodes via the StatefulSet DNS records
+      (redis-0.redis-headless.namespace.svc.cluster.local).
+    name: "migrate_redis_to_headless_service"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.5
+
+  - key: p04_upgrade_checklist
+    memory_type: procedural
+    content: >-
+      For run {run_id}, the safe k8s minor version upgrade pre-check
+      checklist derived from the 1.29 cascade: 1) regenerate mTLS certs
+      with the latest cert-manager, 2) audit kube-dns Corefile for
+      version-specific stanzas, 3) grep client libraries for deprecated
+      service-discovery API usage, 4) verify service-mesh sidecar
+      concurrency limits meet or exceed app pool sizes.
+    name: "k8s_upgrade_pre_check_checklist"
+    importance: 0.95
+    confidence: 0.95
+    activation: 0.6
+
+relationships:
+  # -------------- CAUSED_BY: the trigger --------------
+
+  - from_key: e02_checkout_500s
+    to_key: e01_upgrade_completion
+    relationship_type: CAUSED_BY
+    confidence: 0.95
+    reason: "the k8s upgrade triggered the visible symptom"
+
+  # -------------- CONTRADICTS: false lead vs truth --------------
+
+  - from_key: s02_app_deploy_was_not_cause
+    to_key: e03_false_blame_app_deploy
+    relationship_type: CONTRADICTS
+    confidence: 0.98
+    reason: "postmortem semantic memory contradicts the initial team blame"
+
+  # -------------- DERIVED_FROM: investigation lineage --------------
+
+  - from_key: e03_false_blame_app_deploy
+    to_key: e02_checkout_500s
+    relationship_type: DERIVED_FROM
+    confidence: 0.9
+    reason: "initial hypothesis derived from the visible symptom"
+
+  - from_key: e04_mtls_errors_ingress
+    to_key: e02_checkout_500s
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "log investigation of the initial symptom found mTLS errors"
+
+  - from_key: e05_cert_regen_partial_fix
+    to_key: e04_mtls_errors_ingress
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "fix action based on the mTLS finding"
+
+  - from_key: e07_kube_dns_configmap_update
+    to_key: e06_dns_failures_investigation
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "fix action based on the DNS investigation"
+
+  - from_key: e09_envoy_sidecar_diagnosis
+    to_key: e08_inventory_db_pool_timeouts
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "root cause found for the inventory timeout symptom"
+
+  - from_key: e11_redis_discovery_deprecation
+    to_key: e10_redis_errors_persist
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "root cause found for the persistent Redis errors"
+
+  - from_key: e12_redis_headless_migration
+    to_key: e11_redis_discovery_deprecation
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "fix based on the deprecation finding"
+
+  - from_key: s01_triple_root_cause
+    to_key: e13_postmortem_published
+    relationship_type: DERIVED_FROM
+    confidence: 0.98
+    reason: "semantic understanding crystallized in the postmortem"
+
+  - from_key: s03_layered_troubleshooting
+    to_key: s01_triple_root_cause
+    relationship_type: DERIVED_FROM
+    confidence: 0.9
+    reason: "generalizes the specific 1.29 case into a mental model"
+
+  - from_key: s04_redis_discovery_vs_timeout
+    to_key: e14_recurrence_30day
+    relationship_type: DERIVED_FROM
+    confidence: 0.9
+    reason: "distinction learned from the recurrence being different"
+
+  - from_key: p01_regen_mtls_certs
+    to_key: e05_cert_regen_partial_fix
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "procedural memory encodes the mTLS fix"
+
+  - from_key: p02_update_kube_dns
+    to_key: e07_kube_dns_configmap_update
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "procedural memory encodes the kube-dns fix"
+
+  - from_key: p03_migrate_redis_headless
+    to_key: e12_redis_headless_migration
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "procedural memory encodes the Redis migration"
+
+  - from_key: p04_upgrade_checklist
+    to_key: s01_triple_root_cause
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "checklist synthesized from the triple root cause"
+
+  # -------------- PRECEDES: chapter-by-chapter timeline --------------
+
+  - from_key: e05_cert_regen_partial_fix
+    to_key: e06_dns_failures_investigation
+    relationship_type: PRECEDES
+    confidence: 0.95
+    reason: "mTLS fix uncovered the next layer symptom"
+
+  - from_key: e07_kube_dns_configmap_update
+    to_key: e08_inventory_db_pool_timeouts
+    relationship_type: PRECEDES
+    confidence: 0.95
+    reason: "DNS fix uncovered the envoy layer symptom"
+
+  - from_key: e09_envoy_sidecar_diagnosis
+    to_key: e10_redis_errors_persist
+    relationship_type: PRECEDES
+    confidence: 0.9
+    reason: "envoy fix revealed the Redis layer was still broken"
+
+  # -------------- RESULTED_IN: outcome edges --------------
+
+  - from_key: e12_redis_headless_migration
+    to_key: e13_postmortem_published
+    relationship_type: RESULTED_IN
+    confidence: 0.95
+    reason: "full recovery led to the postmortem publication"
+
+  # -------------- SUPPORTS: cross-reinforcement --------------
+
+  - from_key: s02_app_deploy_was_not_cause
+    to_key: s01_triple_root_cause
+    relationship_type: SUPPORTS
+    confidence: 0.95
+    reason: "clearing the false lead reinforces the true root cause"
+
+  # -------------- RELATED_TO / REINFORCES: recurrence --------------
+
+  - from_key: e14_recurrence_30day
+    to_key: e10_redis_errors_persist
+    relationship_type: RELATED_TO
+    confidence: 0.7
+    reason: "same service, similar-looking symptom, but different cause"
+
+  - from_key: e14_recurrence_30day
+    to_key: s04_redis_discovery_vs_timeout
+    relationship_type: REINFORCES
+    confidence: 0.9
+    reason: "the recurrence being different confirmed the distinction"
+
+queries:
+  - id: "q1-triple-root-cause-synthesis"
+    question: >-
+      For run {run_id}, what was the actual root cause of the Kubernetes
+      1.29 upgrade cascade outage across the four services?
+    top_k: 8
+    expected_top_content_contains:
+      - "mtls"
+      - "kube-dns"
+      - "redis"
+    expected_recall_contains_any:
+      - "mTLS"
+      - "kube-dns"
+      - "Redis"
+      - "triple"
+      - "three simultaneous"
+    expected_answer_contains:
+      - "mtls"
+      - "kube-dns"
+      - "redis"
+    expected_answer_missing:
+      - "the app deployment caused"
+      - "the v4.7 deploy caused"
+      - "morning deploy was the cause"
+
+  - id: "q2-refute-false-blame"
+    question: >-
+      For run {run_id}, someone from another team is saying the morning
+      app deployment of checkout-svc v4.7.0 caused the 1.29 outage. Is
+      that correct? What does the postmortem say?
+    top_k: 6
+    expected_top_content_contains:
+      - "not the cause"
+      - "cleared of causation"
+      - "did not improve"
+    expected_recall_contains_any:
+      - "not the cause"
+      - "cleared of causation"
+      - "app-team was incorrect"
+      - "did not improve"
+    expected_answer_contains:
+      - "not"
+    expected_answer_missing:
+      - "yes, it caused"
+      - "the deployment caused the outage"
+      - "correct, that was the cause"
+
+  - id: "q3-why-rollback-didnt-help"
+    question: >-
+      For run {run_id}, why did rolling back the morning checkout-svc
+      v4.7.0 deployment not fix the 500 errors?
+    top_k: 6
+    expected_top_content_contains:
+      - "not the cause"
+      - "did not improve"
+      - "unrelated"
+    expected_recall_contains_any:
+      - "did not improve"
+      - "unrelated"
+      - "coincided"
+      - "cleared of causation"
+    expected_answer_contains:
+      - "not the cause"
+    expected_answer_missing:
+      - "the rollback fixed"
+
+  - id: "q4-investigation-timeline"
+    question: >-
+      For run {run_id}, what order were the layers of the 1.29 outage
+      discovered and fixed?
+    top_k: 8
+    expected_top_content_contains:
+      - "mtls"
+      - "kube-dns"
+      - "envoy"
+      - "redis"
+    expected_recall_contains_any:
+      - "mTLS"
+      - "kube-dns"
+      - "envoy"
+      - "Redis"
+    expected_answer_contains:
+      - "mtls"
+      - "redis"
+
+  - id: "q5-analogical-pre-upgrade-checklist"
+    question: >-
+      For run {run_id}, we're planning another Kubernetes minor version
+      upgrade next month. What pre-check checklist should we follow
+      based on what we learned from the 1.29 cascade?
+    top_k: 8
+    expected_top_content_contains:
+      - "checklist"
+      - "cert"
+      - "kube-dns"
+      - "redis"
+    expected_recall_contains_any:
+      - "checklist"
+      - "regenerate mTLS"
+      - "kube-dns Corefile"
+      - "deprecated service-discovery"
+    expected_answer_contains:
+      - "cert"
+      - "kube-dns"
+    expected_answer_missing:
+      - "roll back app deploys first"
+
+  - id: "q6-distinguish-recurrence"
+    question: >-
+      For run {run_id}, the recommendations-svc is throwing Redis errors
+      again but the error is 'ConnectionError: Timeout reading from
+      socket', not MOVED redirect. Is this the same issue as the 1.29
+      Redis discovery incident?
+    top_k: 6
+    expected_top_content_contains:
+      - "different"
+      - "timeout"
+      - "discovery"
+    expected_recall_contains_any:
+      - "different root cause"
+      - "resource-starved"
+      - "different symptoms"
+      - "not discovery failures"
+    expected_answer_contains:
+      - "different"
+    expected_answer_missing:
+      - "same discovery issue"
+      - "same as before"
+      - "same root cause"
+
+  - id: "q7-cross-hop-connection"
+    question: >-
+      For run {run_id}, how were the mTLS certificate issue and the
+      Redis service-discovery deprecation connected?
+    top_k: 8
+    expected_top_content_contains:
+      - "1.29"
+      - "upgrade"
+      - "triple"
+    expected_recall_contains_any:
+      - "1.29 upgrade"
+      - "three simultaneous"
+      - "compounded"
+      - "each individual fix uncovered"
+    expected_answer_contains:
+      - "1.29"
+    expected_answer_missing: []
+
+  - id: "q8-procedural-inventory"
+    question: >-
+      For run {run_id}, if a similar three-way infra failure happens on
+      a future k8s upgrade, what documented procedural fixes do we
+      already have in memory to apply?
+    top_k: 8
+    expected_top_content_contains:
+      - "cert"
+      - "kube-dns"
+      - "redis"
+    expected_recall_contains_any:
+      - "cert-manager"
+      - "kube-dns Corefile"
+      - "headless Service"
+      - "pre-check checklist"
+    expected_answer_contains:
+      - "cert"
+      - "kube-dns"
+      - "redis"
+    expected_answer_missing: []

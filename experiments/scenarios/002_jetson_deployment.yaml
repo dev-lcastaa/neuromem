@@ -1,0 +1,40 @@
+id: "002-jetson-deployment"
+title: "User discusses Jetson deployment"
+description: >
+  User provides several details about deploying services on the Jetson Orin
+  Nano; agent should retrieve the right subset per question.
+
+memories:
+  - memory_type: semantic
+    content: "For run {run_id}, the Jetson Orin Nano hosts the memory_api and dashboard services."
+    subject: "jetson_services"
+    importance: 0.85
+    confidence: 0.95
+
+  - memory_type: episodic
+    content: "For run {run_id}, the user deployed the memory_api on the Jetson using Docker Compose on port 8000."
+    event: "deployment"
+    importance: 0.7
+    confidence: 0.9
+
+  - memory_type: semantic
+    content: "For run {run_id}, the Jetson Orin Nano has 8GB of RAM, which constrains local model choices."
+    subject: "jetson_hardware"
+    importance: 0.8
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, what services am I running on the Jetson?"
+    top_k: 5
+    expected_top_content_contains: ["memory_api", "dashboard"]
+    expected_recall_contains_any: ["memory_api", "dashboard", "jetson"]
+    expected_answer_contains: ["memory_api"]
+    expected_answer_missing: []
+
+  - id: "q2"
+    question: "For run {run_id}, how much RAM does the Jetson have?"
+    top_k: 5
+    expected_top_content_contains: ["8gb", "ram"]
+    expected_recall_contains_any: ["8gb", "ram", "hardware"]
+    expected_answer_contains: ["8"]

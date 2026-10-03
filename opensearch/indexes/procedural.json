@@ -1,0 +1,67 @@
+{
+  "settings": {
+    "index": {
+      "knn": true,
+      "knn.algo_param.ef_search": 100,
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "refresh_interval": "1s"
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "memory_type":         { "type": "keyword" },
+      "content":             { "type": "text", "fields": { "keyword": { "type": "keyword", "ignore_above": 512 } } },
+      "content_vector": {
+        "type": "knn_vector",
+        "dimension": 3072,
+        "method": {
+          "name": "hnsw",
+          "space_type": "cosinesimil",
+          "engine": "lucene",
+          "parameters": { "ef_construction": 128, "m": 16 }
+        }
+      },
+
+      "created_at":          { "type": "date" },
+      "updated_at":          { "type": "date" },
+      "last_accessed_at":    { "type": "date" },
+
+      "importance":          { "type": "float" },
+      "confidence":          { "type": "float" },
+      "activation":          { "type": "float" },
+      "access_count":        { "type": "integer" },
+
+      "source_memory_ids":   { "type": "keyword" },
+      "related_memory_ids":  { "type": "keyword" },
+
+      "name":                { "type": "keyword" },
+      "goal":                { "type": "text" },
+      "preconditions":       { "type": "text" },
+      "steps": {
+        "type": "nested",
+        "properties": {
+          "order":            { "type": "integer" },
+          "action":           { "type": "text" },
+          "expected_result":  { "type": "text" }
+        }
+      },
+      "expected_outcome":    { "type": "text" },
+      "success_count":       { "type": "integer" },
+      "failure_count":       { "type": "integer" },
+      "success_rate":        { "type": "float" },
+
+      "metadata": {
+        "properties": {
+          "agent_id":         { "type": "keyword" },
+          "agent_role":       { "type": "keyword" },
+          "source":           { "type": "keyword" },
+          "entities":         { "type": "keyword" },
+          "embedding_model":  { "type": "keyword" },
+          "embedding_dim":    { "type": "integer" }
+        }
+      }
+    }
+  }
+}

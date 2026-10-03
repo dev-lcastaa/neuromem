@@ -1,0 +1,35 @@
+id: "005-failure-resolution"
+title: "User successfully resolves failure"
+description: >
+  The user reports the resolution of the earlier OpenSearch failure. Tests
+  whether the agent connects the resolution to the original cause and reports
+  the specific commands used.
+
+memories:
+  - memory_type: procedural
+    content: "For run {run_id}, to fix the OpenSearch startup, run `sudo sysctl -w vm.max_map_count=262144` and persist it in /etc/sysctl.d/99-opensearch.conf."
+    name: "fix_vm_max_map_count"
+    importance: 0.9
+    confidence: 0.95
+
+  - memory_type: episodic
+    content: "For run {run_id}, the user successfully brought OpenSearch up after setting vm.max_map_count to 262144."
+    event: "opensearch_resolved"
+    importance: 0.8
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, how do I fix the OpenSearch startup problem?"
+    top_k: 5
+    expected_top_content_contains: ["sysctl", "vm.max_map_count"]
+    expected_recall_contains_any: ["sysctl", "vm.max_map_count", "262144"]
+    expected_answer_contains: ["vm.max_map_count", "262144"]
+
+  - id: "q2"
+    question: "For run {run_id}, did I resolve the OpenSearch failure?"
+    top_k: 5
+    expected_top_content_contains: ["successfully", "resolved", "up"]
+    expected_recall_contains_any: ["successfully", "resolved", "brought up"]
+    expected_answer_contains: []
+    expected_answer_missing: ["still failing", "still broken"]

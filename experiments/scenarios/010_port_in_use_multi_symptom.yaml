@@ -1,0 +1,60 @@
+id: "010-port-in-use-multi-symptom"
+title: "Multiple symptoms for one root cause"
+description: >
+  Two different error messages that mean the same thing. Tests whether the
+  agent connects varied surface symptoms to a single root cause and returns
+  the OS-appropriate diagnostic command.
+
+memories:
+  - memory_type: episodic
+    content: >-
+      For run {run_id}, uvicorn crashed at boot with 'RuntimeError - Address
+      already in use' after a previous dev-server instance was killed with a
+      hung terminal that kept the socket open.
+    event: "uvicorn_port_conflict"
+    importance: 0.7
+    confidence: 0.95
+
+  - memory_type: episodic
+    content: >-
+      For run {run_id}, a second boot of the same service produced 'OSError -
+      Errno 98 Address already in use' on Linux with the same underlying
+      cause as the earlier Windows RuntimeError incident.
+    event: "linux_port_conflict"
+    importance: 0.7
+    confidence: 0.95
+
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, both 'RuntimeError Address already in use' and
+      'OSError Errno 98' indicate a TCP port conflict - another process
+      still holds the port because it did not release its socket on
+      shutdown.
+    subject: "port_conflict_symptoms_share_root_cause"
+    importance: 0.9
+    confidence: 0.95
+
+  - memory_type: procedural
+    content: >-
+      For run {run_id}, to resolve port-in-use errors find the holder then
+      kill it. On Windows - Get-NetTCPConnection -LocalPort 8000 then
+      Stop-Process -Id <pid>. On Linux - lsof -i 8000 then kill <pid>.
+    name: "resolve_port_in_use"
+    importance: 0.9
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, uvicorn is crashing with 'Address already in use' on port 8000. What's the root cause?"
+    top_k: 5
+    expected_top_content_contains: ["port conflict", "already holds", "still holds", "port"]
+    expected_recall_contains_any: ["port conflict", "TCP port", "another process"]
+    expected_answer_contains: ["port"]
+    expected_answer_missing: ["firewall"]
+
+  - id: "q2"
+    question: "For run {run_id}, how do I find and kill the process holding port 8000 on Windows?"
+    top_k: 5
+    expected_top_content_contains: ["get-nettcpconnection", "stop-process"]
+    expected_recall_contains_any: ["Get-NetTCPConnection", "Stop-Process"]
+    expected_answer_contains: ["get-nettcpconnection"]

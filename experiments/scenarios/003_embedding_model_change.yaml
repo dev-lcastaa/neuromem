@@ -1,0 +1,38 @@
+id: "003-embedding-model-change"
+title: "User changes embedding model"
+description: >
+  Two conflicting statements exist in memory: an older preference and a newer
+  updated preference. Recall should surface enough context to reason about
+  which is current; a NeuroMem-style retriever with recency/importance signals
+  should do better than naive semantic RAG.
+
+memories:
+  - memory_type: semantic
+    content: "For run {run_id}, the user originally used BGE-M3 as the embedding model on the Jetson."
+    subject: "embedding_model_old"
+    importance: 0.5
+    confidence: 0.9
+    activation: 0.3
+
+  - memory_type: semantic
+    content: "For run {run_id}, the user has switched to OpenAI text-embedding-3-large at 3072 dimensions."
+    subject: "embedding_model_current"
+    importance: 0.95
+    confidence: 0.98
+    activation: 0.85
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, which embedding model am I currently using?"
+    top_k: 5
+    expected_top_content_contains: ["text-embedding-3-large", "openai"]
+    expected_recall_contains_any: ["text-embedding-3-large", "openai"]
+    expected_answer_contains: ["text-embedding-3-large"]
+    expected_answer_missing: ["bge-m3"]
+
+  - id: "q2"
+    question: "For run {run_id}, what dimension are my embedding vectors?"
+    top_k: 5
+    expected_top_content_contains: ["3072"]
+    expected_recall_contains_any: ["3072"]
+    expected_answer_contains: ["3072"]

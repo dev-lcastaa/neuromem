@@ -1,0 +1,369 @@
+id: "011-connection-pool-cascade"
+title: "Production connection pool exhaustion cascade — asyncpg + Redis + Kubernetes"
+description: >
+  A realistic multi-week debugging arc for a FastAPI service that hit asyncpg
+  connection pool exhaustion in production. Twelve memories capture the timeline
+  of a wrong lead (memory limits), the discovery of the real root cause, a
+  premature fix that made things worse, the correct fix, and a later Redis
+  incident that resolved via analogical pattern reuse.
+
+  This scenario exercises the parts of NeuroMem that shallow scenarios do not:
+    - SUPERSEDES edges between a bad fix and a good fix
+    - CAUSED_BY / DERIVED_FROM chains from deployment to symptom to root cause
+    - REINFORCES edges when a later incident confirms a semantic pattern
+    - Cross-subsystem generalization (asyncpg pattern applied to Redis)
+    - `expected_answer_missing` traps to catch the tempting-but-wrong fix
+
+  Naive semantic RAG should struggle on queries 2 and 5 where the top-1 by
+  cosine similarity is the *bad* fix or a superficially matching but wrong
+  memory. NeuroMem's importance + relationship signals should promote the
+  correct answers.
+
+memories:
+  - key: initial_incident_502s
+    memory_type: episodic
+    content: >-
+      For run {run_id}, the production FastAPI service began returning
+      intermittent HTTP 502 responses at 14:07 UTC on the day after the v3.4
+      release. Latency spikes clustered around cache-heavy endpoints;
+      requests per second was normal but tail latency exploded from 40ms to
+      12 seconds.
+    event: "prod_502_incident"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.4
+
+  - key: false_lead_memory_limits
+    memory_type: episodic
+    content: >-
+      For run {run_id}, the team's first hypothesis was a memory leak because
+      three pods had been OOMKilled in two hours. Kubernetes memory limits
+      were raised from 512Mi to 2Gi. Pods stopped dying but the intermittent
+      502s continued unchanged, proving memory was not the actual cause.
+    event: "memory_limit_false_lead"
+    importance: 0.6
+    confidence: 0.95
+    activation: 0.25
+
+  - key: pool_exhaustion_discovery
+    memory_type: episodic
+    content: >-
+      For run {run_id}, engineer inspected `pg_stat_activity` during a 502
+      window and found the asyncpg pool showing 20 of 20 connections in
+      active use, average query duration 3 seconds, and PostgreSQL's
+      `remaining_connection_slots` at zero. This was the real signal — the
+      pool was exhausted, not memory.
+    event: "pool_exhaustion_root_cause_found"
+    importance: 0.9
+    confidence: 0.98
+    activation: 0.55
+
+  - key: sem_pool_exhaustion_root_cause
+    memory_type: semantic
+    content: >-
+      For run {run_id}, asyncpg connection pool exhaustion under FastAPI has a
+      classic root cause: when a request handler raises an exception outside
+      an `async with pool.acquire()` block, the connection is never released
+      back to the pool. Under load the leak accumulates until every slot is
+      permanently held and every subsequent request times out.
+    subject: "asyncpg_pool_leak_pattern"
+    importance: 0.95
+    confidence: 0.98
+    activation: 0.7
+
+  - key: bad_fix_increase_pool_size
+    memory_type: procedural
+    content: >-
+      For run {run_id}, attempted fix v1 was to raise the asyncpg pool
+      max_size from 20 to 100 without changing the exception path. This
+      bought approximately 40 minutes of stability before 502s returned
+      worse than before, because the larger pool consumed every one of
+      Postgres's max_connections slots and starved neighbouring services
+      that shared the database.
+    name: "increase_pool_size_bad_fix"
+    importance: 0.35
+    confidence: 0.95
+    activation: 0.15
+
+  - key: good_fix_async_with_context_manager
+    memory_type: procedural
+    content: >-
+      For run {run_id}, the proper fix for asyncpg pool leaks is to wrap
+      every connection acquisition in `async with pool.acquire() as conn:`.
+      The context manager guarantees the connection is released back to the
+      pool on any exit path including uncaught exceptions. Post-deploy
+      telemetry showed 100 percent release rate and pool utilization
+      dropped from 20/20 to a steady 3/20 under the same load.
+    name: "async_with_context_manager_fix"
+    importance: 0.95
+    confidence: 0.98
+    activation: 0.75
+
+  - key: sem_async_resource_generalization
+    memory_type: semantic
+    content: >-
+      For run {run_id}, the `async with resource.acquire()` idiom generalizes
+      to every async resource pool: PostgreSQL via asyncpg, Redis via
+      redis-py, HTTP client sessions via httpx, and any custom pool. Any
+      exception path that skips explicit release causes silent leaks that
+      only manifest as pool exhaustion under sustained load.
+    subject: "async_pool_idiom_generalization"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.6
+
+  - key: redis_similar_incident
+    memory_type: episodic
+    content: >-
+      For run {run_id}, two weeks after the Postgres fix Redis started
+      throwing `redis.exceptions.ConnectionError: max number of clients
+      reached` under the same load pattern. Pool telemetry showed the exact
+      same leak signature as the earlier asyncpg incident: connections
+      acquired but not released after certain error paths in a pipeline
+      block.
+    event: "redis_pool_exhaustion"
+    importance: 0.8
+    confidence: 0.95
+    activation: 0.5
+
+  - key: redis_fix_reused_pattern
+    memory_type: procedural
+    content: >-
+      For run {run_id}, applied the same context-manager pattern to Redis by
+      wrapping every pipeline in `async with redis.pipeline() as pipe:`.
+      Confirmed via pool telemetry that the leak stopped within one deploy
+      cycle. Root cause was verified to be identical to the earlier
+      Postgres incident.
+    name: "redis_context_manager_fix"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.55
+
+  - key: sem_kubernetes_pool_masking
+    memory_type: semantic
+    content: >-
+      For run {run_id}, under Kubernetes connection pool exhaustion often
+      masquerades as a memory issue because the pod restart on OOMKill or
+      liveness probe failure resets the pool state, temporarily masking
+      the underlying leak. This is why the false memory-limit lead
+      persisted for so long: raising memory limits stopped the restarts
+      that were accidentally clearing the leak.
+    subject: "kubernetes_hides_pool_leak"
+    importance: 0.85
+    confidence: 0.95
+    activation: 0.5
+
+  - key: deploy_v3_4_context
+    memory_type: episodic
+    content: >-
+      For run {run_id}, the v3.4 release introduced a new
+      `/cache/warm` endpoint that Kubernetes now hits from the liveness
+      probe every 10 seconds. Under the default probe timeout this added
+      approximately 6 concurrent requests per pod, each holding an
+      asyncpg connection for the duration of a slow cache-warm query.
+    event: "v3_4_release_health_check_change"
+    importance: 0.75
+    confidence: 0.95
+    activation: 0.3
+
+  - key: sem_health_check_antipattern
+    memory_type: semantic
+    content: >-
+      For run {run_id}, running expensive database or cache queries inside
+      Kubernetes health check endpoints is an antipattern: probe intervals
+      compound the request volume, and any resource leak that would take
+      hours to become visible under normal traffic becomes exponentially
+      visible when the probe amplifies the request rate.
+    subject: "k8s_health_check_antipattern"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.6
+
+relationships:
+  - from_key: initial_incident_502s
+    to_key: deploy_v3_4_context
+    relationship_type: CAUSED_BY
+    confidence: 0.9
+    reason: "release v3.4 added the amplifying health-check endpoint"
+
+  - from_key: false_lead_memory_limits
+    to_key: initial_incident_502s
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "investigation attempt following the initial symptom"
+
+  - from_key: pool_exhaustion_discovery
+    to_key: initial_incident_502s
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "the real diagnostic that identified the root cause"
+
+  - from_key: sem_pool_exhaustion_root_cause
+    to_key: pool_exhaustion_discovery
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "durable semantic memory extracted from the discovery event"
+
+  - from_key: bad_fix_increase_pool_size
+    to_key: sem_pool_exhaustion_root_cause
+    relationship_type: DERIVED_FROM
+    confidence: 0.85
+    reason: "first fix attempt based on the root cause understanding"
+
+  - from_key: good_fix_async_with_context_manager
+    to_key: bad_fix_increase_pool_size
+    relationship_type: SUPERSEDES
+    confidence: 0.98
+    reason: "correct fix replaces the earlier ineffective one"
+
+  - from_key: sem_async_resource_generalization
+    to_key: good_fix_async_with_context_manager
+    relationship_type: DERIVED_FROM
+    confidence: 0.9
+    reason: "the pattern generalized from the concrete fix"
+
+  - from_key: redis_similar_incident
+    to_key: sem_async_resource_generalization
+    relationship_type: REINFORCES
+    confidence: 0.95
+    reason: "later incident confirmed the generalization"
+
+  - from_key: redis_fix_reused_pattern
+    to_key: good_fix_async_with_context_manager
+    relationship_type: DERIVED_FROM
+    confidence: 0.95
+    reason: "reused the same pattern in a new subsystem"
+
+  - from_key: sem_kubernetes_pool_masking
+    to_key: false_lead_memory_limits
+    relationship_type: DERIVED_FROM
+    confidence: 0.9
+    reason: "explains why the false lead persisted"
+
+  - from_key: deploy_v3_4_context
+    to_key: sem_health_check_antipattern
+    relationship_type: RESULTED_IN
+    confidence: 0.85
+    reason: "the release surfaced the antipattern"
+
+queries:
+  - id: "q1-triage"
+    question: >-
+      For run {run_id}, our production FastAPI service is returning
+      intermittent 502s and pods are getting OOMKilled after our latest
+      release. Backend logs show occasional connection errors. What should we
+      investigate first, and what should we not waste time on?
+    top_k: 6
+    expected_top_content_contains:
+      - "pool"
+      - "exhaustion"
+      - "asyncpg"
+    expected_recall_contains_any:
+      - "connection pool"
+      - "asyncpg"
+      - "pg_stat_activity"
+      - "exhaustion"
+    expected_answer_contains:
+      - "pool"
+    expected_answer_missing:
+      - "raise memory"
+      - "increase memory limit"
+      - "add more memory"
+
+  - id: "q2-superseded-fix-trap"
+    question: >-
+      For run {run_id}, we're seeing asyncpg connection pool exhaustion
+      under load. Should we just increase the pool size?
+    top_k: 6
+    expected_top_content_contains:
+      - "async with"
+      - "context manager"
+      - "release"
+    expected_recall_contains_any:
+      - "async with"
+      - "context manager"
+      - "release rate"
+    expected_answer_contains:
+      - "context manager"
+    expected_answer_missing:
+      - "just increase"
+      - "raise the pool"
+      - "increase max_size"
+      - "raising max_size"
+
+  - id: "q3-analogical-reasoning"
+    question: >-
+      For run {run_id}, Redis is starting to throw `max number of clients
+      reached` errors under the same load pattern that used to hit our
+      Postgres pool. What is most likely happening, and how do we fix it?
+    top_k: 6
+    expected_top_content_contains:
+      - "context manager"
+      - "async with"
+      - "pool"
+    expected_recall_contains_any:
+      - "async with"
+      - "context manager"
+      - "generalizes"
+      - "same leak signature"
+    expected_answer_contains:
+      - "context manager"
+    expected_answer_missing:
+      - "increase max clients"
+      - "raise max clients"
+
+  - id: "q4-kubernetes-masking-explanation"
+    question: >-
+      For run {run_id}, why did our connection pool leak look like an
+      OOMKill problem for weeks before we noticed the real cause?
+    top_k: 6
+    expected_top_content_contains:
+      - "restart"
+      - "reset"
+      - "kubernetes"
+    expected_recall_contains_any:
+      - "restart"
+      - "reset"
+      - "OOMKill"
+      - "masking"
+    expected_answer_contains:
+      - "restart"
+    expected_answer_missing: []
+
+  - id: "q5-root-cause-of-timing"
+    question: >-
+      For run {run_id}, what was actually different about the v3.4 release
+      that made this bug appear when it did?
+    top_k: 6
+    expected_top_content_contains:
+      - "v3.4"
+      - "health"
+      - "cache"
+    expected_recall_contains_any:
+      - "cache/warm"
+      - "cache-warm"
+      - "liveness"
+      - "health check"
+    expected_answer_contains:
+      - "health"
+    expected_answer_missing: []
+
+  - id: "q6-procedural-recall"
+    question: >-
+      For run {run_id}, how do we prevent connection pool leaks in async
+      Python code across every subsystem?
+    top_k: 6
+    expected_top_content_contains:
+      - "async with"
+      - "context manager"
+      - "acquire"
+    expected_recall_contains_any:
+      - "async with pool.acquire"
+      - "context manager"
+      - "generalizes"
+    expected_answer_contains:
+      - "async with"
+      - "context manager"
+    expected_answer_missing:
+      - "increase pool size"
+      - "raise max_size"

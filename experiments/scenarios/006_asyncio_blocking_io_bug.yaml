@@ -1,0 +1,51 @@
+id: "006-asyncio-blocking-io-bug"
+title: "Async worker deadlock from blocking I/O"
+description: >
+  Debug the classic "my async code just hangs" bug. Tests whether the agent can
+  connect symptom (hung worker) to root cause (blocking sync call in a coroutine)
+  and surface the procedural fix (run_in_executor).
+
+memories:
+  - memory_type: semantic
+    content: >-
+      For run {run_id}, calling a blocking sync function (like requests.get, or
+      time.sleep) directly inside an async coroutine deadlocks the asyncio event
+      loop and freezes every other task in the process.
+    subject: "async_blocking_io_root_cause"
+    importance: 0.9
+    confidence: 0.95
+    activation: 0.6
+
+  - memory_type: episodic
+    content: >-
+      For run {run_id}, the batch processor hung indefinitely; py-spy showed
+      every task blocked on requests.get() inside an async handler. Wrapping
+      the call in run_in_executor immediately unblocked all pending coroutines.
+    event: "asyncio_hang_debug"
+    importance: 0.8
+    confidence: 0.95
+
+  - memory_type: procedural
+    content: >-
+      For run {run_id}, to safely call blocking libraries from async code use
+      loop.run_in_executor(None, blocking_fn, *args) so the sync work runs on a
+      thread pool without stalling the event loop.
+    name: "wrap_blocking_calls_with_executor"
+    importance: 0.9
+    confidence: 0.95
+
+queries:
+  - id: "q1"
+    question: "For run {run_id}, my async worker is hanging with no obvious error. What could cause that?"
+    top_k: 5
+    expected_top_content_contains: ["blocking", "sync", "coroutine", "deadlock"]
+    expected_recall_contains_any: ["blocking", "run_in_executor", "requests.get", "deadlock"]
+    expected_answer_contains: ["blocking"]
+    expected_answer_missing: ["gil", "cpu-bound", "cpu bound"]
+
+  - id: "q2"
+    question: "For run {run_id}, how do I call a blocking library from inside an async function?"
+    top_k: 5
+    expected_top_content_contains: ["run_in_executor"]
+    expected_recall_contains_any: ["run_in_executor", "executor"]
+    expected_answer_contains: ["run_in_executor"]
