@@ -42,7 +42,6 @@ pipeline {
                         umask 077
                         trap 'rm -f .env' EXIT
                         printf 'OPENAI_API_KEY=%s\\n' "$OPENAI_API_KEY" > .env
-                        docker compose down
                         docker compose -p neuromem config --quiet
                         docker compose -p neuromem up --build --detach --remove-orphans
 
