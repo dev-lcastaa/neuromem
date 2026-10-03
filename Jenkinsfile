@@ -1,6 +1,10 @@
 pipeline {
     agent { label 'development' }
 
+    environment {
+        PATH = "/home/lcastaa/.local/bin:${env.PATH}"
+    }
+
     options {
         disableConcurrentBuilds()
         timestamps()
