@@ -47,7 +47,7 @@ def _fake_rabbitmq_for_unit_tests(
     if request.node.get_closest_marker("integration"):
         return
 
-    async def connect(_cls, _url: str, *, retry_delay_ms: int) -> _FakeRabbitMQ:
+    async def connect(_cls, _url: str) -> _FakeRabbitMQ:
         return _FakeRabbitMQ()
 
     monkeypatch.setattr("apps.memory_api.main.RabbitMQBroker.connect", classmethod(connect))
