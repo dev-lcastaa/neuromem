@@ -11,14 +11,6 @@ pipeline {
         timeout(time: 30, unit: 'MINUTES')
     }
 
-    parameters {
-        booleanParam(
-            name: 'DEPLOY',
-            defaultValue: true,
-            description: 'Deploy the tested revision to the Docker host.'
-        )
-    }
-
     stages {
         stage('Validate') {
             steps {
@@ -35,9 +27,6 @@ pipeline {
         }
 
         stage('Deploy') {
-            when {
-                expression { params.DEPLOY }
-            }
             steps {
                 withCredentials([string(credentialsId: 'neuromem-openai-api-key', variable: 'OPENAI_API_KEY')]) {
                     sh '''
