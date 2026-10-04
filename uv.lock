@@ -14,6 +14,19 @@ resolution-markers = [
 ]
 
 [[package]]
+name = "aio-pika"
+version = "10.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "aiormq" },
+    { name = "yarl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2a/77/9f8ae466a9e8d16ee4136bf12fea656160fbfbd32295d1df8248c92e77b8/aio_pika-10.1.0.tar.gz", hash = "sha256:ec340bff09d169a367717a4dd822969dac9cc5e835e22a67020e3613784f3139", size = 86810, upload-time = "2026-09-27T11:28:07.651Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a3/7d/4204ac838183657bd08ca25d0e6a825d646c50c7941368819a9bbee6411e/aio_pika-10.1.0-py3-none-any.whl", hash = "sha256:8dd8aa4514328876e9208970b7dae3a7650afb3373906a2a530286742ebe0f74", size = 58042, upload-time = "2026-09-27T11:28:06.092Z" },
+]
+
+[[package]]
 name = "aiohappyeyeballs"
 version = "2.7.1"
 source = { registry = "https://pypi.org/simple" }
@@ -120,6 +133,19 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5e/19/08d41839658bdd44a0ed2480f3891705ecb487ce28c0dde62c9040c997e0/aiohttp-3.14.3-cp314-cp314t-win32.whl", hash = "sha256:b304db572b4368edd8dda8a2274f73156fe15558fca4a917cb8a09fc47af5963", size = 474180, upload-time = "2026-07-23T01:57:19.306Z" },
     { url = "https://files.pythonhosted.org/packages/99/5d/3cd6ef0a2b2851f7ab913b5b079334781bd50ff56a323e4454063377a080/aiohttp-3.14.3-cp314-cp314t-win_amd64.whl", hash = "sha256:b20032766aedf6261c7a566585a40867d092ac03a0d81592d5370ef9b054f99b", size = 500528, upload-time = "2026-07-23T01:57:21.762Z" },
     { url = "https://files.pythonhosted.org/packages/a4/37/cfd1ed540a4d318da025590d96b728e63713c09e9377950fc655dadeb856/aiohttp-3.14.3-cp314-cp314t-win_arm64.whl", hash = "sha256:2e1161602f45a54de2ce0905243a95f58cb42dcd378402f3697f5e0b21e9d2e7", size = 469280, upload-time = "2026-07-23T01:57:24.241Z" },
+]
+
+[[package]]
+name = "aiormq"
+version = "7.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pamqp" },
+    { name = "yarl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5c/09/42586119acc0c0d705fdb810c8a155c11827598faa54301e58c119a4e684/aiormq-7.2.1.tar.gz", hash = "sha256:05d55dfbdba0c3854ceb5f118855b0d47fa15fbd08dae1b9c4c0415237c769aa", size = 74840, upload-time = "2026-09-29T07:18:24.224Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/e9/8c10248926849a9dab64e0b01804f4749ef0940eaa2723574656425b7dc1/aiormq-7.2.1-py3-none-any.whl", hash = "sha256:4a96b0dce49880f3677976863b680414417eb00d0a9e3d381664bd86c64cea11", size = 39750, upload-time = "2026-09-29T07:18:22.604Z" },
 ]
 
 [[package]]
@@ -1686,6 +1712,7 @@ name = "neuromem"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "aio-pika" },
     { name = "aiohttp" },
     { name = "fastapi" },
     { name = "httpx" },
@@ -1720,6 +1747,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aio-pika", specifier = ">=9.4" },
     { name = "aiohttp", specifier = ">=3.10" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "httpx", specifier = ">=0.27" },
@@ -1971,6 +1999,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/7d/fa/3944b40b07da9ce895c0e6303a5ab7d53da063554f534556b134a54d6093/packaging-26.3.tar.gz", hash = "sha256:94edc256424af38762eb31306eed28beb9f0efc50a8837492c9d6fd6004aed79", size = 313412, upload-time = "2026-08-04T18:15:28.737Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl", hash = "sha256:d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c", size = 129956, upload-time = "2026-08-04T18:15:27.159Z" },
+]
+
+[[package]]
+name = "pamqp"
+version = "4.0.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/31/4c/33a0ddaaac7bc42f9a542dbaaee8b580ceca3f89bf5da7c498d1fa97ff9a/pamqp-4.0.1.tar.gz", hash = "sha256:9dd13b828e346622793981f14a5df817fce5de998c746209d6c0154eb8403970", size = 137192, upload-time = "2026-07-06T16:37:51.732Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/71/14/1dfc08b743ba995a38dee0ea09beb46a05c7fe8ac53d729095905f7bf11d/pamqp-4.0.1-py3-none-any.whl", hash = "sha256:a547f45128b06e42ce8d7a739b0cfcc40f2c724770622eaaff4a3f587b1cf7d0", size = 32773, upload-time = "2026-07-06T16:37:50.623Z" },
 ]
 
 [[package]]

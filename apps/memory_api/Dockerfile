@@ -13,6 +13,8 @@ RUN uv sync --frozen --no-install-project --no-dev
 
 COPY memory ./memory
 COPY models ./models
+COPY messaging ./messaging
+COPY ingestion ./ingestion
 COPY apps ./apps
 COPY README.md ./
 COPY opensearch/indexes ./opensearch/indexes

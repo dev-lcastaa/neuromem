@@ -13,14 +13,17 @@ Agent clients -> 192.168.1.208:8001/mcp ----+
                   |
 Dashboard 192.168.1.208:8501 -----+-> Memory API 192.168.1.208:8100 / :8000 (container)
                       |          |
-                      v          v
-                  OpenSearch 192.168.1.208:9200   OpenAI API (HTTPS)
-                  persistent volume  chat + embeddings
+                      +--> RabbitMQ --> Ingestion worker --+
+                      |                                    |
+                      +--> OpenSearch 192.168.1.208:9200 <-+
+                           persistent volume
 ```
 
-Docker Compose manages all four services on its isolated `neuromem-net` network. The API bootstraps the four
-`neuromem-*` indexes from the bundled mappings. OpenSearch starts as a single-node
-POC cluster, not a highly available production cluster.
+Docker Compose manages the API, MCP, dashboard, OpenSearch, RabbitMQ and ingestion
+worker on its isolated `neuromem-net` network. The API bootstraps the
+`neuromem-*` memory indexes and ingestion-job index from bundled mappings.
+OpenSearch starts as a single-node POC cluster, not a highly available production
+cluster.
 
 The storage engine remains **OpenSearch**, not Elasticsearch: the existing
 adapter and vector mappings use OpenSearch k-NN APIs.
@@ -40,6 +43,7 @@ adapter and vector mappings use OpenSearch k-NN APIs.
 
 - Docker Engine with Docker Compose, or Docker Desktop with Linux containers
 - An OpenAI API key
+- A strong RabbitMQ password (`RABBITMQ_PASSWORD`)
 - Internet access for container images and hosted model calls
 - For Python development: Python 3.12+ and [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
@@ -52,7 +56,7 @@ alone is 512 MB and does not include off-heap vector memory.
 ## First-time setup
 
 ```bash
-cp .env.example .env             # fill in OPENAI_API_KEY at minimum
+cp .env.example .env             # fill in OPENAI_API_KEY and RABBITMQ_PASSWORD
 docker compose up --build -d
 docker compose ps
 ```
@@ -102,6 +106,14 @@ The calling agent supplies its own LLM. NeuroMem uses its configured OpenAI
 models for internal consolidation and embeddings, not to host that agent's model.
 Store and recall use paid embeddings; consolidation can also incur chat charges.
 Retrieved memories should be treated as untrusted data, not agent instructions.
+
+Agent-created candidates are queued in RabbitMQ and consolidated by a separate
+worker. The chat response includes `consolidation_job_id`; poll
+`GET /agent/jobs/{job_id}` for queued, processing, retrying, succeeded or failed
+status. RabbitMQ uses durable queues, delayed retries and a dead-letter queue,
+and is not published to the LAN. Jenkins requires Secret Text credentials
+`neuromem-openai-api-key` and `neuromem-rabbitmq-password`; use a URL-safe random
+password for the latter.
 
 To run MCP separately against an existing API:
 

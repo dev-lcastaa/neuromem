@@ -13,6 +13,8 @@ def test_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "EMBEDDING_DIM",
         "HEALTH_CHECK_LLM",
         "AGENT_ROLE_ID",
+        "RABBITMQ_HOST",
+        "RABBITMQ_PASSWORD",
     ]:
         monkeypatch.delenv(var, raising=False)
     s = Settings(_env_file=None)  # type: ignore[call-arg]
@@ -25,6 +27,7 @@ def test_defaults_when_no_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.health_check_llm is False
     assert s.health_check_embeddings is False
     assert s.agent_role_id == "default"
+    assert s.rabbitmq_url == "amqp://neuromem:@localhost:5672/"
 
 
 def test_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -35,6 +38,11 @@ def test_env_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
     assert s.openai_api_key == "sk-abc"
     assert s.embedding_dim == 1536
     assert s.health_check_llm is True
+
+
+def test_rabbitmq_url_encodes_credentials() -> None:
+    settings = Settings(_env_file=None, rabbitmq_password="p@ss/word")  # type: ignore[call-arg]
+    assert settings.rabbitmq_url == "amqp://neuromem:p%40ss%2Fword@localhost:5672/"
 
 
 def test_get_settings_is_cached() -> None:

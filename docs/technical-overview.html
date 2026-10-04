@@ -692,8 +692,9 @@ ctx._source.last_accessed_at = params.now;</code></pre>
   <h3>Async and non-blocking</h3>
   <p>
     Consolidation runs in the background so the user gets their response immediately. When you chat with the agent,
-    the response comes back after the answer node finishes; a fire-and-forget task pushes the extracted candidates
-    onto an <code>asyncio.Queue</code>, and a worker drains it. Errors in consolidation never fail the user's turn.
+    the response comes back after the answer and candidate-extraction nodes finish; the API publishes extracted
+    candidates to durable RabbitMQ queues, and a separate worker consolidates them with retries and job status.
+    If RabbitMQ is unavailable, the API returns a service-unavailable response rather than pretending the job queued.
   </p>
 </section>
 
@@ -789,9 +790,9 @@ END ◀── memory_candidate_extraction ◀── answer ◀── evaluate_re
       <tr><td>Storage</td><td><code>memory/storage/</code></td><td><code>MemoryStore</code> Protocol + <code>OpenSearchMemoryStore</code> — all k-NN, BM25, mget, bulk painless updates</td></tr>
       <tr><td>Retrieval</td><td><code>memory/retrieval/</code></td><td>Ranking helpers, <code>RankWeights</code>, <code>RecallQuery</code>, <code>RecallResponse</code>, <code>Explanation</code></td></tr>
       <tr><td>Service facade</td><td><code>memory/service.py</code></td><td>Orchestrates recall, schedules strengthening, computes decay, stats, search, timeline, graph</td></tr>
-      <tr><td>Consolidation</td><td><code>memory/consolidation/</code></td><td>Job envelope, LLM-driven adjudication, in-process <code>asyncio.Queue</code> + worker</td></tr>
+      <tr><td>Consolidation</td><td><code>memory/consolidation/</code>, <code>messaging/</code>, <code>apps/ingest_worker/</code></td><td>Durable RabbitMQ jobs, retry/dead-letter handling, separate worker, persisted job status</td></tr>
       <tr><td>Agent</td><td><code>apps/agent/</code></td><td>LangGraph state + node closures. Zero direct storage calls</td></tr>
-      <tr><td>Memory API</td><td><code>apps/memory_api/</code></td><td>FastAPI application factory + all HTTP routes. Lifespan owns clients and the consolidation worker</td></tr>
+      <tr><td>Memory API</td><td><code>apps/memory_api/</code></td><td>FastAPI routes, OpenSearch job status, and RabbitMQ publisher; consolidation runs in a separate worker</td></tr>
       <tr><td>Dashboard</td><td><code>apps/dashboard/</code></td><td>Streamlit UI with six tabs — talks only over HTTP to <code>memory_api</code></td></tr>
       <tr><td>Experiments</td><td><code>experiments/</code></td><td>Scenario loader, RAG vs NeuroMem modes, metrics, markdown report generator</td></tr>
     </tbody>
@@ -887,15 +888,14 @@ END ◀── memory_candidate_extraction ◀── answer ◀── evaluate_re
       <h4>Async everywhere</h4>
       <p>
         <code>aiohttp</code>-backed OpenSearch client, async OpenAI client, async FastAPI, async LangGraph nodes,
-        <code>asyncio.Queue</code> for the consolidation worker. Fire-and-forget tasks tracked in a set so they can't
-        be garbage-collected mid-execution.
+        durable RabbitMQ delivery, and a separate consolidation worker with retries and dead-letter handling.
       </p>
     </div>
     <div class="card warm">
       <h4>Docker Compose</h4>
       <p>
-        Two-service deployment on the Jetson: <code>memory_api</code> and <code>dashboard</code>. Both point at the
-        externally-provisioned OpenSearch cluster on the OptiPlex via LAN. No infrastructure duplication.
+        Compose runs <code>memory_api</code>, <code>rabbitmq</code>, <code>ingest_worker</code>, MCP, dashboard, and
+        single-node OpenSearch on the isolated <code>neuromem-net</code> network.
       </p>
     </div>
   </div>
@@ -1033,7 +1033,7 @@ END ◀── memory_candidate_extraction ◀── answer ◀── evaluate_re
                             │
                             │  (background)
                             ▼
-              ConsolidationQueue.enqueue
+              RabbitMQ publish
                             │
                             ▼
                     Worker picks up job

@@ -1,5 +1,20 @@
 
 services:
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-neuromem}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 10
+
   opensearch:
     image: opensearchproject/opensearch:2.19.4
     environment:
@@ -38,8 +53,13 @@ services:
       OPENSEARCH_PASSWORD: ""
       OPENSEARCH_VERIFY_CERTS: "false"
       BOOTSTRAP_INDEXES: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-neuromem}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
     depends_on:
       opensearch:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     ports:
       - "${NEUROMEM_HOST_IP:-192.168.1.208}:8100:8000"
@@ -72,6 +92,28 @@ services:
       start_period: 10s
       retries: 3
 
+  ingest_worker:
+    build:
+      context: .
+      dockerfile: apps/memory_api/Dockerfile
+    container_name: neuromem-ingest-worker
+    command: ["python", "-m", "apps.ingest_worker.main"]
+    env_file: .env
+    environment:
+      OPENSEARCH_URL: http://opensearch:9200
+      OPENSEARCH_USER: ""
+      OPENSEARCH_PASSWORD: ""
+      OPENSEARCH_VERIFY_CERTS: "false"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-neuromem}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+    depends_on:
+      memory_api:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   dashboard:
     build:
       context: .
@@ -88,6 +130,7 @@ services:
 
 volumes:
   opensearch-data:
+  rabbitmq-data:
 
 networks:
   default:

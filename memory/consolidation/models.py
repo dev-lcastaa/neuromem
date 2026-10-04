@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Literal
+from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +15,7 @@ ConflictDecision = Literal["DUPLICATE", "SUPERSEDES", "CONTRADICTS", "INDEPENDEN
 class ConsolidationJob(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    job_id: str = Field(default_factory=lambda: str(uuid4()))
     user_message: str
     assistant_reply: str = ""
     candidates: list[MemoryCandidate] = Field(default_factory=list)

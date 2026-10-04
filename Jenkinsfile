@@ -29,12 +29,15 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                withCredentials([string(credentialsId: 'neuromem-openai-api-key', variable: 'OPENAI_API_KEY')]) {
+                withCredentials([
+                    string(credentialsId: 'neuromem-openai-api-key', variable: 'OPENAI_API_KEY'),
+                    string(credentialsId: 'neuromem-rabbitmq-password', variable: 'RABBITMQ_PASSWORD')
+                ]) {
                     sh '''
                         set +x
                         umask 077
                         trap 'rm -f .env' EXIT
-                        printf 'OPENAI_API_KEY=%s\\n' "$OPENAI_API_KEY" > .env
+                        printf 'OPENAI_API_KEY=%s\\nRABBITMQ_USER=neuromem\\nRABBITMQ_PASSWORD=%s\\n' "$OPENAI_API_KEY" "$RABBITMQ_PASSWORD" > .env
                         docker compose -p neuromem config --quiet
                         docker compose -p neuromem up --build --detach --remove-orphans
 

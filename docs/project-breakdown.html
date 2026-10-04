@@ -421,7 +421,7 @@
     <tr>
       <td>Consolidation</td>
       <td><code>memory/consolidation/</code></td>
-      <td>Job envelope, LLM-driven adjudication, in-process <code>asyncio.Queue</code> + worker.</td>
+      <td>Job envelope, LLM-driven adjudication, durable RabbitMQ queues + separate worker.</td>
     </tr>
     <tr>
       <td>Agent</td>
@@ -659,7 +659,7 @@ uv run --no-sync mypy memory models apps experiments</code></pre>
   <li>Cross-encoder reranking.</li>
   <li>Multi-hop relationship traversal beyond depth 3.</li>
   <li>LLM-as-judge scoring in evaluation (substring matching only).</li>
-  <li>Distributed workers or Kafka / Redis queues (in-process <code>asyncio.Queue</code>).</li>
+  <li>Additional distributed workers or Kafka / Redis beyond the RabbitMQ worker.</li>
   <li>Automatic deletion of decayed / superseded memories.</li>
   <li>Multi-tenant memory scoping (single global pool, <code>agent_id</code> is provenance only).</li>
   <li>Local LLM inference (POC uses OpenAI end-to-end).</li>

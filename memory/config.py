@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import quote
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -20,6 +21,20 @@ class Settings(BaseSettings):
     opensearch_user: str = ""
     opensearch_password: str = ""
     opensearch_verify_certs: bool = False
+
+    # --- Async ingestion ---
+    rabbitmq_host: str = "localhost"
+    rabbitmq_port: int = 5672
+    rabbitmq_user: str = "neuromem"
+    rabbitmq_password: str = ""
+    consolidation_max_retries: int = 5
+    consolidation_retry_delay_ms: int = 5000
+
+    @property
+    def rabbitmq_url(self) -> str:
+        user = quote(self.rabbitmq_user, safe="")
+        password = quote(self.rabbitmq_password, safe="")
+        return f"amqp://{user}:{password}@{self.rabbitmq_host}:{self.rabbitmq_port}/"
 
     # --- OpenAI ---
     openai_api_key: str = ""
@@ -65,8 +80,7 @@ class Settings(BaseSettings):
     # if False, recall does not schedule strengthening writes; useful for tests + read-only replay
     strengthening_enabled: bool = True
 
-    # --- Consolidation (Phase 4) ---
-    consolidation_enabled: bool = True
+    # --- Consolidation ---
     # semantic score above which a nearby memory is considered for conflict adjudication
     consolidation_similarity_threshold: float = 0.75
     # how many near-neighbours to consider per candidate

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 from typing import Any, cast
+from uuid import NAMESPACE_URL, uuid5
 
 from pydantic import ValidationError
 
@@ -73,7 +74,7 @@ class ConsolidationService:
 
         outcomes: list[ConsolidationOutcome] = []
         for idx, cand in enumerate(job.candidates):
-            outcome = await self._process_candidate(idx, cand, source.id)
+            outcome = await self._process_candidate(idx, cand, source.id, job.job_id)
             outcomes.append(outcome)
 
         return ConsolidationResult(
@@ -85,6 +86,7 @@ class ConsolidationService:
     async def _persist_turn(self, job: ConsolidationJob) -> EpisodicMemory:
         content = f"USER: {job.user_message}\nASSISTANT: {job.assistant_reply}"
         turn = EpisodicMemory(
+            id=_stable_memory_id(job.job_id, "source", MemoryType.EPISODIC),
             content=content,
             event="agent_turn",
             source_conversation=job.conversation_id,
@@ -101,7 +103,7 @@ class ConsolidationService:
         return persisted
 
     async def _process_candidate(
-        self, index: int, cand: MemoryCandidate, source_id: str
+        self, index: int, cand: MemoryCandidate, source_id: str, job_id: str
     ) -> ConsolidationOutcome:
         if cand.classification == "IGNORE":
             return ConsolidationOutcome(
@@ -111,10 +113,11 @@ class ConsolidationService:
             )
 
         memory_type = _MEMORY_TYPE_MAP[cand.classification]
+        memory_id = _stable_memory_id(job_id, f"candidate:{index}:{memory_type.value}", memory_type)
 
         conflicts: list[ConsolidationDecision] = []
         if memory_type in _CONFLICT_CHECKED_TYPES:
-            conflicts = await self._detect_conflicts(cand, memory_type)
+            conflicts = await self._detect_conflicts(cand, memory_type, exclude_id=memory_id)
 
         duplicates = [d for d in conflicts if d.decision == "DUPLICATE"]
         if duplicates:
@@ -125,12 +128,18 @@ class ConsolidationService:
                 conflicts=duplicates,
             )
 
-        memory = _candidate_to_memory(cand, memory_type, self._settings)
+        memory = _candidate_to_memory(
+            cand,
+            memory_type,
+            self._settings,
+            memory_id=memory_id,
+        )
         created = await self._service.create_memory(memory)
         assert created.id is not None
 
         await self._service.create_relationship(
             Relationship(
+                id=_stable_relationship_id(created.id, source_id, RelationshipType.DERIVED_FROM),
                 from_id=created.id,
                 to_id=source_id,
                 from_type=memory_type,
@@ -164,7 +173,7 @@ class ConsolidationService:
         )
 
     async def _detect_conflicts(
-        self, cand: MemoryCandidate, memory_type: MemoryType
+        self, cand: MemoryCandidate, memory_type: MemoryType, *, exclude_id: str
     ) -> list[ConsolidationDecision]:
         recall = await self._service.recall(
             RecallQuery(
@@ -177,6 +186,7 @@ class ConsolidationService:
         similar = [
             r
             for r in recall.memories
+            if r.id != exclude_id
             if r.explanation.semantic >= self._settings.consolidation_similarity_threshold
         ]
         if not similar:
@@ -227,6 +237,7 @@ class ConsolidationService:
             return
         await self._service.create_relationship(
             Relationship(
+                id=_stable_relationship_id(new_id, decision.existing_id, rel_type),
                 from_id=new_id,
                 to_id=decision.existing_id,
                 from_type=new_type,
@@ -246,7 +257,11 @@ _MEMORY_TYPE_MAP: dict[str, MemoryType] = {
 
 
 def _candidate_to_memory(
-    cand: MemoryCandidate, memory_type: MemoryType, settings: Settings
+    cand: MemoryCandidate,
+    memory_type: MemoryType,
+    settings: Settings,
+    *,
+    memory_id: str,
 ) -> Memory:
     metadata = MemoryMetadata(
         agent_id=settings.agent_role_id,
@@ -255,6 +270,7 @@ def _candidate_to_memory(
         entities=list(cand.entities),
     )
     base_kwargs: dict[str, Any] = {
+        "id": memory_id,
         "content": cand.content,
         "importance": cand.importance,
         "confidence": cand.confidence,
@@ -267,6 +283,21 @@ def _candidate_to_memory(
     if memory_type is MemoryType.PROCEDURAL:
         return ProceduralMemory(**base_kwargs, name=cand.content[:60])
     raise ValueError(f"Unhandled memory type: {memory_type}")
+
+
+def _stable_memory_id(job_id: str, key: str, memory_type: MemoryType) -> str:
+    stable = uuid5(NAMESPACE_URL, f"neuromem:{job_id}:{key}")
+    prefix = {
+        MemoryType.EPISODIC: "epi",
+        MemoryType.SEMANTIC: "sem",
+        MemoryType.PROCEDURAL: "pro",
+    }[memory_type]
+    return f"{prefix}_{stable.hex}"
+
+
+def _stable_relationship_id(from_id: str, to_id: str, rel_type: RelationshipType) -> str:
+    stable = uuid5(NAMESPACE_URL, f"neuromem:{from_id}:{to_id}:{rel_type.value}")
+    return f"rel_{stable.hex}"
 
 
 _ConflictDecisionValue = ConflictDecision  # re-export for tests

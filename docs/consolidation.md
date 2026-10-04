@@ -6,15 +6,16 @@ Consolidation turns raw agent turns and extracted candidates into durable memori
 
 | Path | Behaviour |
 |---|---|
-| Async (per turn) | `POST /agent/chat` pushes a `ConsolidationJob` onto an in-process `asyncio.Queue` after the graph returns; a single background task drains the queue. The user sees `consolidation_queued: true` in the response. |
+| Async (per turn) | `POST /agent/chat` persists a job status and publishes a persistent `ConsolidationJob` to RabbitMQ after the graph returns. A separate worker consumes it. The response includes `consolidation_queued` and `consolidation_job_id`. |
 | Sync (manual) | `POST /memory/consolidate` runs the same pipeline in-line and returns the full `ConsolidationResult`. Useful for research, replay, and the future dashboard. |
 
-The queue is capped by process memory; jobs are processed serially. Errors are logged and the worker survives — the queue never blocks on a bad job.
+RabbitMQ uses durable main, delayed-retry, and dead-letter queues. The worker processes one delivery at a time, retries failures up to the configured limit, and exposes status at `GET /agent/jobs/{job_id}`. Memory and relationship IDs are deterministic per job so redelivery is idempotent.
 
 ## Job shape
 
 ```json
 {
+  "job_id": "5f0c9df9-4750-4be7-8e72-91bdce9ee23c",
   "user_message": "I now prefer Qdrant over OpenSearch.",
   "assistant_reply": "Noted.",
   "conversation_id": "conv-123",
@@ -83,7 +84,12 @@ The queue is capped by process memory; jobs are processed serially. Errors are l
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `CONSOLIDATION_ENABLED` | `true` | Start the worker in lifespan and enqueue from `/agent/chat`. |
+| `RABBITMQ_HOST` | `localhost` | Broker hostname; Compose sets this to `rabbitmq`. |
+| `RABBITMQ_PORT` | `5672` | Broker port on the private Compose network. |
+| `RABBITMQ_USER` | `neuromem` | Broker account. |
+| `RABBITMQ_PASSWORD` | required in deployment | Broker credential, supplied through Jenkins credentials. |
+| `CONSOLIDATION_MAX_RETRIES` | `5` | Retries before the job is moved to the dead-letter queue. |
+| `CONSOLIDATION_RETRY_DELAY_MS` | `5000` | Delay between attempts. |
 | `CONSOLIDATION_SIMILARITY_THRESHOLD` | `0.75` | Semantic score above which a nearby memory is sent to the LLM for adjudication. |
 | `CONSOLIDATION_CONFLICT_POOL` | `3` | How many near-neighbours to consider per candidate. |
 | `OPENAI_MODEL_REASONING` | `gpt-4o` | Model used for conflict adjudication. |
@@ -105,7 +111,7 @@ Every derived memory has a `DERIVED_FROM` edge to the raw turn `EpisodicMemory` 
 - Learned adjudication — the LLM does one shot with a small prompt; no calibration or self-check.
 - Streaming responses.
 - `superseded_by` field updates on the old memory (Phase 5).
-- Rate limiting or backpressure on the queue.
+- Rate limiting or queue admission control.
 
 ## Cost
 

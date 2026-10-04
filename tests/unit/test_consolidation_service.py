@@ -80,6 +80,43 @@ async def test_process_persists_turn_and_ignores_ignore_candidates() -> None:
 
 
 @pytest.mark.asyncio
+async def test_redelivery_reuses_memory_and_relationship_ids() -> None:
+    service = AsyncMock()
+    persisted_ids: list[str] = []
+    relationship_ids: list[str] = []
+
+    async def create_memory(memory):  # type: ignore[no-untyped-def]
+        persisted_ids.append(memory.id)
+        return memory
+
+    async def create_relationship(relationship):  # type: ignore[no-untyped-def]
+        relationship_ids.append(relationship.id)
+        return relationship
+
+    service.create_memory.side_effect = create_memory
+    service.create_relationship.side_effect = create_relationship
+    job = ConsolidationJob(
+        job_id="stable-job",
+        user_message="It rained.",
+        candidates=[
+            MemoryCandidate(
+                classification="EPISODIC",
+                content="Rain started at 3pm.",
+                reason="test event",
+            )
+        ],
+    )
+    consolidator = ConsolidationService(service=service, llm=AsyncMock(), settings=_settings())
+
+    await consolidator.process(job)
+    await consolidator.process(job)
+
+    assert persisted_ids[0] == persisted_ids[2]
+    assert persisted_ids[1] == persisted_ids[3]
+    assert relationship_ids[0] == relationship_ids[1]
+
+
+@pytest.mark.asyncio
 async def test_semantic_candidate_creates_and_links_derived_from() -> None:
     service = AsyncMock()
     created_ids = iter(["epi_turn_1", "sem_1"])

@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager, suppress
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -13,12 +12,13 @@ from opensearchpy import AsyncOpenSearch
 
 from apps.agent.graph import build_agent_graph
 from apps.memory_api.routers import agent, health, memory
+from ingestion.jobs import OpenSearchIngestionJobs
 from memory.config import get_settings
-from memory.consolidation.queue import ConsolidationQueue, run_worker
 from memory.consolidation.service import ConsolidationService
 from memory.logging import configure_logging, get_logger
 from memory.service import MemoryService
 from memory.storage.opensearch import OpenSearchMemoryStore
+from messaging.rabbitmq import RabbitMQBroker
 from models.embeddings import OpenAIEmbeddingProvider
 from models.llm import OpenAIProvider
 
@@ -44,6 +44,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         client=opensearch_client,
         mappings_dir=Path(settings.mappings_dir),
     )
+    ingestion_jobs = OpenSearchIngestionJobs(
+        client=opensearch_client,
+        mappings_dir=Path(settings.mappings_dir),
+    )
 
     embeddings_provider = OpenAIEmbeddingProvider(
         client=openai_client,
@@ -56,6 +60,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.opensearch = opensearch_client
     app.state.openai = openai_client
     app.state.memory_store = memory_store
+    app.state.ingestion_jobs = ingestion_jobs
     llm_provider = OpenAIProvider(
         client=openai_client,
         default_model=settings.openai_model_reasoning,
@@ -73,19 +78,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     consolidation_service = ConsolidationService(
         service=memory_service, llm=llm_provider, settings=settings
     )
-    consolidation_queue = ConsolidationQueue()
+    ingestion_broker = await RabbitMQBroker.connect(settings.rabbitmq_url)
     app.state.consolidation_service = consolidation_service
-    app.state.consolidation_queue = consolidation_queue
-    worker_task: asyncio.Task[None] | None = None
-    if settings.consolidation_enabled:
-        worker_task = asyncio.create_task(
-            run_worker(consolidation_queue, consolidation_service.process),
-            name="consolidation_worker",
-        )
+    app.state.ingestion_broker = ingestion_broker
 
     if settings.bootstrap_indexes:
         try:
             await memory_store.bootstrap()
+            await ingestion_jobs.bootstrap()
             logger.info("memory_api.bootstrap.ok")
         except Exception as err:
             logger.warning("memory_api.bootstrap.failed", error=str(err))
@@ -99,10 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        if worker_task is not None:
-            worker_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await worker_task
+        await ingestion_broker.close()
         await openai_client.close()
         await opensearch_client.close()
         logger.info("memory_api.shutdown")

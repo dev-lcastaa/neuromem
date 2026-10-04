@@ -7,7 +7,11 @@ from fastapi.testclient import TestClient
 
 from apps.agent.models import MemoryCandidate
 from apps.memory_api.main import create_app
-from apps.memory_api.routers.agent import get_agent_graph, get_consolidation_queue
+from apps.memory_api.routers.agent import (
+    get_agent_graph,
+    get_ingestion_broker,
+    get_ingestion_jobs,
+)
 
 
 @pytest.fixture
@@ -21,10 +25,20 @@ def consolidation_queue() -> AsyncMock:
 
 
 @pytest.fixture
-def client(agent_graph: AsyncMock, consolidation_queue: AsyncMock) -> TestClient:
+def ingestion_jobs() -> AsyncMock:
+    return AsyncMock()
+
+
+@pytest.fixture
+def client(
+    agent_graph: AsyncMock,
+    consolidation_queue: AsyncMock,
+    ingestion_jobs: AsyncMock,
+) -> TestClient:
     app = create_app()
     app.dependency_overrides[get_agent_graph] = lambda: agent_graph
-    app.dependency_overrides[get_consolidation_queue] = lambda: consolidation_queue
+    app.dependency_overrides[get_ingestion_broker] = lambda: consolidation_queue
+    app.dependency_overrides[get_ingestion_jobs] = lambda: ingestion_jobs
     return TestClient(app)
 
 
@@ -57,6 +71,7 @@ def test_chat_enqueues_when_candidates_present(
     client: TestClient,
     agent_graph: AsyncMock,
     consolidation_queue: AsyncMock,
+    ingestion_jobs: AsyncMock,
 ) -> None:
     agent_graph.ainvoke.return_value = {
         "final_response": "noted",
@@ -78,12 +93,51 @@ def test_chat_enqueues_when_candidates_present(
 
     assert r.status_code == 200
     assert r.json()["consolidation_queued"] is True
+    assert r.json()["consolidation_job_id"]
+    ingestion_jobs.create.assert_awaited_once()
     consolidation_queue.enqueue.assert_awaited_once()
     job = consolidation_queue.enqueue.await_args.args[0]
     assert job.user_message == "please remember I prefer X"
     assert job.assistant_reply == "noted"
     assert job.conversation_id == "conv-1"
     assert len(job.candidates) == 1
+
+
+def test_job_status_route_returns_record(client: TestClient, ingestion_jobs: AsyncMock) -> None:
+    ingestion_jobs.get.return_value = {
+        "job_id": "job-1",
+        "status": "queued",
+        "attempts": 0,
+        "created_at": "2026-10-04T00:00:00Z",
+        "updated_at": "2026-10-04T00:00:00Z",
+    }
+
+    response = client.get("/agent/jobs/job-1")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "queued"
+
+
+def test_queue_failure_marks_job_failed(
+    client: TestClient,
+    agent_graph: AsyncMock,
+    consolidation_queue: AsyncMock,
+    ingestion_jobs: AsyncMock,
+) -> None:
+    agent_graph.ainvoke.return_value = {
+        "final_response": "noted",
+        "candidate_memories": [
+            MemoryCandidate(classification="SEMANTIC", content="user prefers X", reason="explicit")
+        ],
+    }
+    consolidation_queue.enqueue.side_effect = RuntimeError("broker unavailable")
+
+    response = client.post("/agent/chat", json={"message": "remember I prefer X"})
+
+    assert response.status_code == 503
+    ingestion_jobs.create.assert_awaited_once()
+    failed_update = ingestion_jobs.update.await_args
+    assert failed_update.kwargs["status"] == "failed"
 
 
 def test_chat_forwards_history(client: TestClient, agent_graph: AsyncMock) -> None:

@@ -1,0 +1,18 @@
+{
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "job_id": {"type": "keyword"},
+      "status": {"type": "keyword"},
+      "attempts": {"type": "integer"},
+      "created_at": {"type": "date"},
+      "updated_at": {"type": "date"},
+      "error": {"type": "text"},
+      "result": {"type": "object", "enabled": false}
+    }
+  }
+}
