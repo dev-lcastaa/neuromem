@@ -12,13 +12,19 @@ def test_compose_manages_storage_and_bootstrap() -> None:
     assert api["depends_on"]["opensearch"]["condition"] == "service_healthy"
     assert api["environment"]["OPENSEARCH_URL"] == "http://opensearch:9200"
     assert api["environment"]["BOOTSTRAP_INDEXES"] == "true"
-    assert api["ports"] == ["127.0.0.1:8100:8000"]
+    assert api["ports"] == ["${NEUROMEM_HOST_IP:-192.168.1.208}:8100:8000"]
     mcp = services["mcp"]
     assert mcp["command"] == ["python", "-m", "apps.mcp_server.main"]
     assert mcp["environment"]["MEMORY_API_URL"] == "http://memory_api:8000"
     assert mcp["depends_on"]["memory_api"]["condition"] == "service_healthy"
-    for service in services.values():
-        assert all(port.startswith("127.0.0.1:") for port in service.get("ports", []))
+    assert services["opensearch"]["ports"] == [
+        "${NEUROMEM_HOST_IP:-192.168.1.208}:9200:9200"
+    ]
+    assert mcp["ports"] == ["${NEUROMEM_HOST_IP:-192.168.1.208}:8001:8001"]
+    assert services["dashboard"]["ports"] == [
+        "${NEUROMEM_HOST_IP:-192.168.1.208}:8501:8501"
+    ]
+    assert config["networks"]["default"]["name"] == "neuromem-net"
 
 
 def test_api_image_includes_bootstrap_mappings_and_package_readme() -> None:

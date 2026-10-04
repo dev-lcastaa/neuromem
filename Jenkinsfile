@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         PATH = "/home/lcastaa/.local/bin:${env.PATH}"
+        NEUROMEM_HOST_IP = '192.168.1.208'
     }
 
     options {
@@ -38,7 +39,7 @@ pipeline {
                         docker compose -p neuromem up --build --detach --remove-orphans
 
                         for attempt in $(seq 1 60); do
-                            if curl -fsS http://127.0.0.1:8100/health >/dev/null; then
+                            if curl -fsS "http://${NEUROMEM_HOST_IP}:8100/health" >/dev/null; then
                                 docker compose -p neuromem ps
                                 exit 0
                             fi

@@ -9,16 +9,16 @@ See [NEUROMEM_POC_PLAN.md](NEUROMEM_POC_PLAN.md) for the full research plan and 
 ## Topology
 
 ```text
-Agent clients -> MCP :8001/mcp ----+
+Agent clients -> 192.168.1.208:8001/mcp ----+
                   |
-Dashboard :8501 ------------------+-> Memory API :8100 (host) / :8000 (container)
+Dashboard 192.168.1.208:8501 -----+-> Memory API 192.168.1.208:8100 / :8000 (container)
                       |          |
                       v          v
-                  OpenSearch :9200   OpenAI API (HTTPS)
+                  OpenSearch 192.168.1.208:9200   OpenAI API (HTTPS)
                   persistent volume  chat + embeddings
 ```
 
-Docker Compose manages all four local services. The API bootstraps the four
+Docker Compose manages all four services on its isolated `neuromem-net` network. The API bootstraps the four
 `neuromem-*` indexes from the bundled mappings. OpenSearch starts as a single-node
 POC cluster, not a highly available production cluster.
 
@@ -62,20 +62,20 @@ overwrite an existing environment file containing your secrets.
 
 Endpoints:
 
-- Dashboard: http://localhost:8501
-- API documentation: http://localhost:8100/docs
-- MCP Streamable HTTP: http://localhost:8001/mcp
-- OpenSearch: http://localhost:9200
+- Dashboard: http://192.168.1.208:8501
+- API documentation: http://192.168.1.208:8100/docs
+- MCP Streamable HTTP: http://192.168.1.208:8001/mcp
+- OpenSearch: http://192.168.1.208:9200
 
 Compose waits for OpenSearch readiness before starting the API, then starts the
 MCP server and dashboard after API liveness. Health probes do not make paid model
 calls by default. `docker compose down` stops the stack and retains memory data;
 `docker compose down -v` permanently deletes the storage volume.
 
-This is a local trusted POC: OpenSearch security is disabled and the API/MCP
-have no user authentication or tenant isolation. All published ports bind to
-localhost. Do not expose them publicly; remote use requires authenticated TLS
-access and appropriate authorization. No container mounts the Docker socket.
+This is a trusted-LAN POC: OpenSearch security is disabled and the API/MCP have
+no user authentication or tenant isolation. Published ports bind to
+`NEUROMEM_HOST_IP`; restrict access with the host firewall to trusted LAN clients
+and do not expose them publicly. No container mounts the Docker socket.
 
 ## Agent MCP connection
 
@@ -86,7 +86,7 @@ For a VS Code workspace MCP configuration, use:
     "servers": {
         "neuromem": {
             "type": "http",
-            "url": "http://localhost:8001/mcp"
+            "url": "http://192.168.1.208:8001/mcp"
         }
     }
 }
@@ -119,14 +119,14 @@ On Windows, targets in the Makefile assume a POSIX shell. Use WSL, Git Bash, or 
 ## Verify OpenSearch reachability
 
 ```bash
-curl http://localhost:9200/_cluster/health
-curl http://localhost:9200/_plugins/_knn/stats
-curl 'http://localhost:9200/_cat/indices/neuromem-*?v'
+curl http://192.168.1.208:9200/_cluster/health
+curl http://192.168.1.208:9200/_plugins/_knn/stats
+curl 'http://192.168.1.208:9200/_cat/indices/neuromem-*?v'
 ```
 
 You should see the four `neuromem-*` indexes. Yellow health is normal on a
 single-node cluster when mappings request replicas. Check
-`http://localhost:8100/health/opensearch` for index readiness.
+`http://192.168.1.208:8100/health/opensearch` for index readiness.
 
 ## Development commands
 
