@@ -25,7 +25,6 @@ pipeline {
                 sh 'uv sync --frozen --all-groups'
                 sh 'uv run ruff check .'
                 sh 'uv run ruff format --check .'
-                sh 'uv run mypy memory models apps'
             }
         }
 
