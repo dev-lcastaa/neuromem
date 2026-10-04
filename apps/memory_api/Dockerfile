@@ -1,5 +1,6 @@
 # Multi-stage build for the NeuroMem memory_api service.
-FROM ghcr.io/astral-sh/uv:0.12.5-python3.12-bookworm-slim AS builder
+FROM python:3.12-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /uvx /bin/
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
