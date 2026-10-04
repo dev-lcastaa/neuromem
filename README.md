@@ -11,7 +11,7 @@ See [NEUROMEM_POC_PLAN.md](NEUROMEM_POC_PLAN.md) for the full research plan and 
 ```text
 Agent clients -> MCP :8001/mcp ----+
                   |
-Dashboard :8501 ------------------+-> Memory API :8000
+Dashboard :8501 ------------------+-> Memory API :8100 (host) / :8000 (container)
                       |          |
                       v          v
                   OpenSearch :9200   OpenAI API (HTTPS)
@@ -63,7 +63,7 @@ overwrite an existing environment file containing your secrets.
 Endpoints:
 
 - Dashboard: http://localhost:8501
-- API documentation: http://localhost:8000/docs
+- API documentation: http://localhost:8100/docs
 - MCP Streamable HTTP: http://localhost:8001/mcp
 - OpenSearch: http://localhost:9200
 
@@ -126,7 +126,7 @@ curl 'http://localhost:9200/_cat/indices/neuromem-*?v'
 
 You should see the four `neuromem-*` indexes. Yellow health is normal on a
 single-node cluster when mappings request replicas. Check
-`http://localhost:8000/health/opensearch` for index readiness.
+`http://localhost:8100/health/opensearch` for index readiness.
 
 ## Development commands
 

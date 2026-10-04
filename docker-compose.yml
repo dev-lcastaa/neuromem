@@ -42,7 +42,7 @@ services:
       opensearch:
         condition: service_healthy
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8100:8000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]

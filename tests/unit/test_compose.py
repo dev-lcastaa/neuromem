@@ -12,6 +12,7 @@ def test_compose_manages_storage_and_bootstrap() -> None:
     assert api["depends_on"]["opensearch"]["condition"] == "service_healthy"
     assert api["environment"]["OPENSEARCH_URL"] == "http://opensearch:9200"
     assert api["environment"]["BOOTSTRAP_INDEXES"] == "true"
+    assert api["ports"] == ["127.0.0.1:8100:8000"]
     mcp = services["mcp"]
     assert mcp["command"] == ["python", "-m", "apps.mcp_server.main"]
     assert mcp["environment"]["MEMORY_API_URL"] == "http://memory_api:8000"

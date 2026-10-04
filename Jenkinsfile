@@ -1,5 +1,5 @@
 pipeline {
-    agent { label 'development' }
+    agent { label 'production' }
 
     environment {
         PATH = "/home/lcastaa/.local/bin:${env.PATH}"
@@ -38,7 +38,7 @@ pipeline {
                         docker compose -p neuromem up --build --detach --remove-orphans
 
                         for attempt in $(seq 1 60); do
-                            if curl -fsS http://127.0.0.1:8000/health >/dev/null; then
+                            if curl -fsS http://127.0.0.1:8100/health >/dev/null; then
                                 docker compose -p neuromem ps
                                 exit 0
                             fi
