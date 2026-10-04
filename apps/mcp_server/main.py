@@ -46,6 +46,8 @@ def create_server(
     *,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> FastMCP:
+    host_ip = os.getenv("NEUROMEM_HOST_IP", "192.168.1.208")
+
     @asynccontextmanager
     async def lifespan(server: FastMCP) -> AsyncIterator[httpx.AsyncClient]:
         async with httpx.AsyncClient(
@@ -63,8 +65,13 @@ def create_server(
         lifespan=lifespan,
         transport_security=TransportSecuritySettings(
             enable_dns_rebinding_protection=True,
-            allowed_hosts=["localhost:*", "127.0.0.1:*", "[::1]:*", "mcp:*"],
-            allowed_origins=["http://localhost:*", "http://127.0.0.1:*", "http://[::1]:*"],
+            allowed_hosts=["localhost:*", "127.0.0.1:*", "[::1]:*", "mcp:*", f"{host_ip}:*"],
+            allowed_origins=[
+                "http://localhost:*",
+                "http://127.0.0.1:*",
+                "http://[::1]:*",
+                f"http://{host_ip}:*",
+            ],
         ),
     )
     read_only = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)

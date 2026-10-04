@@ -16,6 +16,7 @@ def test_compose_manages_storage_and_bootstrap() -> None:
     mcp = services["mcp"]
     assert mcp["command"] == ["python", "-m", "apps.mcp_server.main"]
     assert mcp["environment"]["MEMORY_API_URL"] == "http://memory_api:8000"
+    assert mcp["environment"]["NEUROMEM_HOST_IP"] == "${NEUROMEM_HOST_IP:-192.168.1.208}"
     assert mcp["depends_on"]["memory_api"]["condition"] == "service_healthy"
     assert services["opensearch"]["ports"] == ["${NEUROMEM_HOST_IP:-192.168.1.208}:9200:9200"]
     assert mcp["ports"] == ["${NEUROMEM_HOST_IP:-192.168.1.208}:8001:8001"]

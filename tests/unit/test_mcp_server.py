@@ -180,3 +180,33 @@ async def test_dns_rebinding_is_rejected() -> None:
         )
         assert response.status_code == 421
         assert not requests
+
+
+async def test_configured_lan_host_is_allowed(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEUROMEM_HOST_IP", "192.168.1.208")
+    server = create_server("http://memory-api")
+    app = server.streamable_http_app()
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://192.168.1.208:8001",
+            headers={
+                "Accept": "application/json, text/event-stream",
+                "Origin": "http://192.168.1.208:8501",
+            },
+        ) as client:
+            response = await client.post(
+                "/mcp",
+                json={
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-03-26",
+                        "capabilities": {},
+                        "clientInfo": {"name": "test", "version": "1"},
+                    },
+                },
+            )
+
+    assert response.status_code == 200

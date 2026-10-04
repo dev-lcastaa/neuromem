@@ -58,6 +58,7 @@ services:
     command: ["python", "-m", "apps.mcp_server.main"]
     environment:
       MEMORY_API_URL: http://memory_api:8000
+      NEUROMEM_HOST_IP: ${NEUROMEM_HOST_IP:-192.168.1.208}
     ports:
       - "${NEUROMEM_HOST_IP:-192.168.1.208}:8001:8001"
     depends_on:
