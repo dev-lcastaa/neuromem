@@ -14,6 +14,7 @@ RUN uv sync --frozen --no-install-project --no-dev --group dashboard
 COPY memory ./memory
 COPY models ./models
 COPY apps ./apps
+COPY README.md ./
 RUN uv sync --frozen --no-dev --group dashboard
 
 FROM python:3.12-slim AS runtime
